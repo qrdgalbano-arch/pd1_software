@@ -1,0 +1,49 @@
+# Environment variables and secrets
+.env
+*.env
+!.env.example
+
+# Python files
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Flutter and Dart generated files
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android generated files
+.gradle/
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Local databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Production environment secrets
+.env.production
