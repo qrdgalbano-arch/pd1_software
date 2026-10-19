@@ -120,6 +120,11 @@ class ExerciseEvaluator:
     def _check_deviations(self, joints: dict[str, JointState], t: float) -> set[str]:
         found: set[str] = set()
         for rule in self.cfg.get("deviations", []):
+            if rule["id"] == "wrong_leg_raised":
+                if joints.get("hip") and joints["hip"].opposite_raised:
+                    found.add("wrong_leg_raised")
+                continue
+
             joint = joints[rule["joint"]]
             if not joint.tracked or joint.angle is None:
                 continue

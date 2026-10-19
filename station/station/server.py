@@ -159,13 +159,22 @@ async def video() -> StreamingResponse:
     async def frames():
         last_seq = -1
         while True:
-            if engine.jpeg is not None and engine.jpeg_seq != last_seq:
+            jpg = engine.jpeg
+            if jpg is not None and engine.jpeg_seq != last_seq:
                 last_seq = engine.jpeg_seq
-                jpg = engine.jpeg
-                yield b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + str(len(jpg)).encode() + b"\r\n\r\n" + jpg + b"\r\n"
-            await asyncio.sleep(1.0 / settings.stream_fps / 2)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + jpg
+                    + b"\r\n"
+                )
+            await asyncio.sleep(1.0 / settings.stream_fps)
 
-    return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(
+        frames(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache, private", "Pragma": "no-cache"},
+    )
 
 
 @app.websocket("/ws/state")
