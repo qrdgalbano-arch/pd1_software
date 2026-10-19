@@ -50,6 +50,7 @@ class JointState:
     rom_max: float | None = None
     hold_seconds: float = 0.0
     lost_seconds: float = 0.0
+    opposite_raised: bool = False
 
     def as_dict(self) -> dict:
         def r(value):
@@ -74,6 +75,9 @@ class JointComponentTwin:
 
     HOLD_BAND_DEG = 5.0
     HOLD_MAX_SPEED_DPS = 20.0
+    POINT_FILTER = {"min_cutoff": 1.0, "beta": 0.007, "d_cutoff": 1.0}
+    MAX_JUMP_DPS = 600.0
+    MAX_REJECTS = 5
 
     def __init__(self, name: str, side: str, min_visibility: float, filter_cfg: dict):
         self.name = name
@@ -82,12 +86,24 @@ class JointComponentTwin:
         names, self._convert = JOINT_DEFINITIONS[name]
         self._indices = [str(LANDMARKS[side][n]) for n in names]
         self._filter = OneEuroFilter(**filter_cfg)
+        self._pt_filters = [
+            (OneEuroFilter(**self.POINT_FILTER), OneEuroFilter(**self.POINT_FILTER))
+            for _ in self._indices
+            ]
+        self._rejects = 0
         self.state = JointState(name=name, side=side)
         self._last_t: float | None = None
         self._lost_since: float | None = None
         self._calibration: list[float] = []
 
     # --- patient-specific calibration -------------------------------------
+    def reset_tracking(self) -> None:
+        self._filter.reset()
+        for fx, fy in self._pt_filters:
+            fx.reset()
+            fy.reset()
+        self._rejects = 0
+    
     def start_calibration(self) -> None:
         self._calibration = []
 
@@ -117,6 +133,10 @@ class JointComponentTwin:
 
         raw = float("nan")
         if points is not None:
+            points = [
+                Point(fx(p.x, t), fy(p.y, t), p.visibility)
+                for p, (fx, fy) in zip(points, self._pt_filters)
+            ]
             raw = self._convert(angle_at(*points))
 
         if points is None or math.isnan(raw):
@@ -125,9 +145,18 @@ class JointComponentTwin:
                 self._lost_since = t
             s.lost_seconds = t - self._lost_since
             s.velocity_dps = 0.0
-            self._filter.reset()
+            if s.lost_seconds > 0.5:
+                self.reset_tracking()
             return s
 
+        if (
+            s.raw_angle is not None and dt > 0
+            and abs(raw - s.raw_angle) / dt > self.MAX_JUMP_DPS
+            and self._rejects < self.MAX_REJECTS
+        ):
+            self._rejects += 1
+            return s
+        self._rejects = 0
         self._lost_since = None
         s.lost_seconds = 0.0
         s.tracked = True
@@ -135,6 +164,18 @@ class JointComponentTwin:
 
         if calibrating:
             self._calibration.append(raw)
+
+        # Check if opposite leg is lifting instead of this target leg
+        s.opposite_raised = False
+        if landmarks is not None and self.name == "hip":
+            opp_side = "right" if self.side == "left" else "left"
+            names, _ = JOINT_DEFINITIONS[self.name]
+            opp_pts = [landmarks.get(str(LANDMARKS[opp_side][n])) for n in names]
+            if opp_pts and not any(p is None or p.visibility < self.min_visibility for p in opp_pts):
+                raw_opp = self._convert(angle_at(*opp_pts))
+                # Opposite leg is lifting (> 20 deg) while prescribed leg remains flat (< 15 deg)
+                if raw_opp > 20.0 and raw < 15.0:
+                    s.opposite_raised = True
 
         previous = s.angle
         s.angle = self._filter(raw - s.baseline, t)
@@ -161,14 +202,42 @@ class ComponentTwinModel:
     min_visibility: float
     filter_cfg: dict
     joints: dict[str, JointComponentTwin] = field(default_factory=dict)
+    active_side: str = "left"
 
     def __post_init__(self) -> None:
+        self.active_side = self.side
         self.joints = {
             name: JointComponentTwin(name, self.side, self.min_visibility, self.filter_cfg)
             for name in ("hip", "knee", "ankle")
         }
 
+    def _resolve_active_side(self, landmarks: dict[str, Point] | None) -> str:
+        """Resolve MediaPipe label swapping by picking the limb with active exercise elevation."""
+        if not landmarks:
+            return self.side
+
+        # Check ankle Y-positions (lower pixel Y = higher physical elevation in camera frame)
+        ankle_l = landmarks.get(str(LANDMARKS["left"]["ankle"]))
+        ankle_r = landmarks.get(str(LANDMARKS["right"]["ankle"]))
+
+        if ankle_l and ankle_r and ankle_l.visibility >= self.min_visibility and ankle_r.visibility >= self.min_visibility:
+            # If one leg is elevated significantly higher (> 40px higher), lock whole leg to that landmark set
+            if ankle_l.y < ankle_r.y - 40:
+                return "left"
+            elif ankle_r.y < ankle_l.y - 40:
+                return "right"
+
+        return self.active_side
+
     def update(self, landmarks: dict[str, Point] | None, t: float, calibrating: bool = False) -> dict[str, JointState]:
+        if not calibrating:
+            self.active_side = self._resolve_active_side(landmarks)
+
+        # Update joint indices to follow the resolved whole-limb side
+        for twin in self.joints.values():
+            names, _ = JOINT_DEFINITIONS[twin.name]
+            twin._indices = [str(LANDMARKS[self.active_side][n]) for n in names]
+
         return {name: twin.update(landmarks, t, calibrating) for name, twin in self.joints.items()}
 
     def start_calibration(self) -> None:
@@ -182,3 +251,7 @@ class ComponentTwinModel:
 
     def as_dict(self) -> dict:
         return {name: twin.state.as_dict() for name, twin in self.joints.items()}
+
+    def reset_tracking(self) -> None:
+        for twin in self.joints.values():
+            twin.reset_tracking()
