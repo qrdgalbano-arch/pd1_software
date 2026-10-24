@@ -1,8 +1,8 @@
-"""Seed the three dirty-prototype exercises, the station staff account,
+﻿"""Seed the three dirty-prototype exercises, the station staff account,
 and demo prescriptions for the Component Twin exercise station.
 
 Run after scripts.seed_demo_users:
-    docker compose exec backend python -m scripts.seed_component_twin_demo
+    cd backend; .\venv\Scripts\python.exe -m scripts.seed_component_twin_demo
 """
 
 import os

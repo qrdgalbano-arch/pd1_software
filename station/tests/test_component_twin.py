@@ -1,4 +1,4 @@
-import math
+﻿import math
 
 from station.component_twin import ComponentTwinModel, angle_at
 from station.config import load_exercise_config, match_exercise_key
@@ -19,7 +19,7 @@ def leg_landmarks(side: str, hip_deg: float, knee_deg: float) -> dict[str, Point
     ankle = (knee[0] + 200 * math.cos(b), knee[1] - 200 * math.sin(b))
     foot = (ankle[0] + 40 * math.cos(b + math.pi / 2), ankle[1] - 40 * math.sin(b + math.pi / 2))
     pts = {"shoulder": shoulder, "hip": hip, "knee": knee, "ankle": ankle, "foot": foot, "heel": ankle}
-    return {str(ids[k]): Point(x, y, 0.99) for k, (x, y) in pts.items()}
+    return {str(ids[k]): Point(x, y, 0.0, 0.99) for k, (x, y) in pts.items()}
 
 
 def run(exercise_key: str, profile, side="left", fps=30.0):
