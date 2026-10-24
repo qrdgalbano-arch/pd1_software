@@ -179,6 +179,48 @@ class ExerciseEngine(threading.Thread):
                 "client_session_id": self.session["client_session_id"]
             }
 
+    def pause_session(self) -> dict:
+        """Freeze evaluation and session time, not just the browser display."""
+        with self._lock:
+            if self.session is None:
+                raise RuntimeError("No session is running")
+            if self.session["phase"] != "paused":
+                self.session["phase_before_pause"] = self.session["phase"]
+                self.session["pause_started"] = time.monotonic()
+                self.session["phase"] = "paused"
+            return {"phase": "paused"}
+
+    def resume_session(self) -> dict:
+        """Exclude paused time from duration, rep timing, hold, and deviations."""
+        with self._lock:
+            session = self.session
+            if session is None:
+                raise RuntimeError("No session is running")
+            if session["phase"] == "paused":
+                now = time.monotonic()
+                paused_for = now - session.pop("pause_started")
+                session["phase"] = session.pop("phase_before_pause")
+                if session["started"] is not None:
+                    session["started"] += paused_for
+                if session["phase"] == "calibrating":
+                    self.twin.start_calibration()
+                    session["calibration_started"] = now
+                # Reset derivatives after rest without erasing session ROM.
+                self.twin.reset_tracking()
+                for twin in self.twin.joints.values():
+                    twin._last_t = None
+                    twin.state.velocity_dps = 0.0
+                ev = self.evaluator
+                if ev is not None:
+                    if ev.current is not None:
+                        ev.current.started_at += paused_for
+                    ev._last_t = None  # Do not credit paused time as a hold.
+                    ev._deviation_since = {
+                        key: since + paused_for
+                        for key, since in ev._deviation_since.items()
+                    }
+            return {"phase": session["phase"]}
+
     def stop_session(self, reason: str = "stopped") -> dict | None:
         with self._lock:
             return self._finish_session(time.monotonic(), reason)
@@ -189,6 +231,10 @@ class ExerciseEngine(threading.Thread):
 
         if session is None or ev is None:
             return None
+
+        # A stop while paused must not add the current rest period to duration.
+        if session["phase"] == "paused":
+            t = session["pause_started"]
 
         if ev.current is not None:
             # The session stopped before the current repetition finished.
@@ -423,6 +469,11 @@ class ExerciseEngine(threading.Thread):
         session = self.session
         ev = self.evaluator
 
+        # Continue the raw camera stream while paused, but freeze all twin and
+        # evaluator metrics (including hold and measured joint ROM).
+        if session is not None and session["phase"] == "paused":
+            return
+
         calibrating = (
             session is not None
             and session["phase"] == "calibrating"
@@ -436,7 +487,6 @@ class ExerciseEngine(threading.Thread):
 
         if session is None or ev is None:
             return
-
         session["frames"] += 1
 
         if self.fps:
@@ -633,7 +683,7 @@ class ExerciseEngine(threading.Thread):
                 elapsed = (
                     0
                     if session["started"] is None
-                    else t - session["started"]
+                    else (session.get("pause_started", t) - session["started"])
                 )
 
                 state["session"] = {

@@ -105,6 +105,22 @@ def start_session(request: StartSessionRequest) -> dict:
         raise HTTPException(409, str(exc))
 
 
+@app.post("/api/session/pause")
+def pause_session() -> dict:
+    try:
+        return engine.pause_session()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@app.post("/api/session/resume")
+def resume_session() -> dict:
+    try:
+        return engine.resume_session()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+
+
 @app.post("/api/session/stop")
 def stop_session() -> dict:
     summary = engine.stop_session("stopped_by_staff")
