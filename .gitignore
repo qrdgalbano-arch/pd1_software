@@ -47,3 +47,5 @@ Thumbs.db
 
 # Production environment secrets
 .env.production
+backend/venv/
+backend/.venv/
