@@ -4,6 +4,7 @@ param(
     [switch]$Reload
 )
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $true
 $root = Split-Path -Parent $PSScriptRoot
 
 Get-Content "$root\.env" | ForEach-Object {
