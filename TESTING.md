@@ -11,9 +11,7 @@ The POC is a rehabilitation monitoring system. It intentionally excludes AI, cam
 Run from the repository root:
 
 ```powershell
-Push-Location .\backend
-.\venv\Scripts\python.exe -m pytest -q
-Pop-Location
+.\scripts\test.ps1
 ```
 
 Current result:

@@ -163,7 +163,7 @@ Before store, managed-device, or external distribution:
 
 ```powershell
 cd backend
-.\venv\Scripts\python.exe -m pytest -q
+..\scripts\test.ps1 -SkipStation
 .\venv\Scripts\python.exe -m compileall .\app
 cd ..\mobile
 flutter test
