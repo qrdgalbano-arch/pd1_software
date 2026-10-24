@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <title>QMMC PD1 - Design B</title>
+    <link rel='stylesheet' href='/static/design_b/design_b.css' />
+  </head>
+  <body>
+    <header class='top'>
+      <div class='brand'>
+        <span class='seal' aria-hidden='true'>+</span>
+        <div>
+          <b>Quirino Memorial Medical Center</b>
+          <small>PD1 Rehabilitation Station - Design B</small>
+        </div>
+      </div>
+      <div class='top-right'>
+        <span id='mode' class='badge warn'>Simulated</span>
+        <span id='who' class='badge ghost' hidden></span>
+        <button id='btn-sync-top' class='btn ghost small' type='button' hidden>
+          Sync <span id='pending-count' class='count'>0</span>
+        </button>
+      </div>
+    </header>
+
+    <main class='wrap' id='main'>
+      <p id='notice' class='notice' role='status' hidden></p>
+
+      <section id='s-patient' class='screen narrow' aria-labelledby='t-patient'>
+        <h1 id='t-patient' tabindex='-1'>Enter Patient ID</h1>
+        <p class='muted'>Ask rehabilitation staff if you do not know your ID.</p>
+        <form id='f-patient' class='card'>
+          <label for='in-patient'>Patient ID</label>
+          <input id='in-patient' autocomplete='off' maxlength='20' placeholder='e.g. 1' />
+          <p id='err-patient' class='error' role='alert' hidden></p>
+          <button class='btn primary wide' type='submit'>Continue</button>
+        </form>
+      </section>
+
+      <section id='s-list' class='screen narrow' hidden aria-labelledby='t-list'>
+        <div class='head-card'>
+          <p class='eyebrow'>EXERCISES TODAY</p>
+          <h1 id='t-list' tabindex='-1'></h1>
+          <p id='list-sub' class='muted'></p>
+        </div>
+        <ol id='list' class='list'></ol>
+        <p id='list-done' class='card center' hidden>All exercises for today are done. Great work!</p>
+      </section>
+
+      <section id='s-instr' class='screen' hidden aria-labelledby='t-instr'>
+        <button class='link' id='instr-back' type='button'>&larr; Back to Exercises</button>
+        <h1 id='t-instr' tabindex='-1'></h1>
+        <div class='chips'>
+          <div class='chip'><small>PRESCRIPTION</small><b id='i-presc'></b></div>
+          <div class='chip'><small>FREQUENCY</small><b id='i-freq'></b></div>
+        </div>
+        <div class='two'>
+          <div class='card'>
+            <h2>Instructions</h2>
+            <ol id='i-steps' class='steps'></ol>
+            <p class='muted small'>You will do the left leg first, then the right leg.</p>
+          </div>
+          <div class='video' role='img' aria-label='Video demonstration placeholder'>
+            <span class='play' aria-hidden='true'>&#9654;</span>
+            <b>[VIDEO DEMONSTRATION]</b>
+          </div>
+        </div>
+        <button id='btn-start' class='btn primary wide' type='button'>Start Session</button>
+      </section>
+
+      <section id='s-rec' class='screen' hidden aria-labelledby='t-rec'>
+        <h1 id='t-rec' tabindex='-1'></h1>
+        <div class='chips'>
+          <div class='chip'><small>ACTIVE LEG</small><b id='r-side'></b></div>
+          <div class='chip'><small>SET</small><b id='r-set'></b></div>
+          <div class='chip'><small>TIME</small><b id='r-time' role='timer'>00:00</b></div>
+        </div>
+        <div class='rec-grid'>
+          <div class='card'>
+            <div class='twin-top'>
+              <b>DIGITAL TWIN</b>
+              <span id='r-source' class='badge warn'>SIMULATED DATA</span>
+            </div>
+            <svg id='twin' viewBox='0 0 600 320' role='img' aria-label='Digital twin of the active leg'></svg>
+            <div class='readout'>
+              <b id='r-angle'>0&deg;</b>
+              <span id='r-state'>Keep moving</span>
+            </div>
+          </div>
+          <div class='card'>
+            <p id='r-reps' class='reps' role='status' aria-live='polite'>Rep 0 / 10</p>
+            <div id='r-bar' class='bar' role='progressbar' aria-label='Repetitions in this set' aria-valuemin='0' aria-valuemax='10' aria-valuenow='0'><i id='r-fill'></i></div>
+            <div class='btn-row'>
+              <button id='btn-pause' class='btn' type='button'>Pause</button>
+              <button id='btn-end' class='btn primary' type='button'>End Session</button>
+            </div>
+            <p class='muted small'>Green joints mean the target angle is reached. The faint leg shows the target position.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id='s-done' class='screen narrow' hidden aria-labelledby='t-done'>
+        <div class='big-icon' id='d-icon' aria-hidden='true'>&#10003;</div>
+        <h1 id='t-done' tabindex='-1' class='center'></h1>
+        <p class='center'>Session saved locally. It will automatically upload once an internet connection is established.</p>
+        <dl class='card summary'>
+          <div><dt>Sets Completed</dt><dd id='d-sets'></dd></div>
+          <div><dt>Total Repetitions</dt><dd id='d-reps'></dd></div>
+          <div><dt>Duration</dt><dd id='d-dur'></dd></div>
+        </dl>
+        <button id='btn-finish' class='btn primary wide' type='button'>Finish Session</button>
+      </section>
+
+      <section id='s-sync' class='screen narrow' hidden aria-labelledby='t-sync'>
+        <button class='link' id='sync-back' type='button'>&larr; Back</button>
+        <h1 id='t-sync' tabindex='-1'>Sync Status</h1>
+        <div class='card center'>
+          <div class='big-icon' id='y-icon' aria-hidden='true'></div>
+          <h2 id='y-title'></h2>
+          <p id='y-last' class='muted'></p>
+          <p id='y-station' class='muted small'></p>
+          <button id='btn-sync-all' class='btn primary' type='button' hidden>Sync all</button>
+        </div>
+        <h2 class='gap'>Pending Sessions</h2>
+        <ul id='y-list' class='plist'></ul>
+        <p class='muted small'>Note: upload to the server is simulated in this build.</p>
+      </section>
+    </main>
+
+    <div id='modal' class='overlay' hidden>
+      <div class='dialog' role='dialog' aria-modal='true' aria-labelledby='m-title'>
+        <div class='big-icon small' aria-hidden='true'>&#10003;</div>
+        <h2 id='m-title'></h2>
+        <p id='m-body'></p>
+        <div class='btn-row'>
+          <button id='m-cancel' class='btn' type='button' hidden></button>
+          <button id='m-ok' class='btn primary' type='button'></button>
+        </div>
+      </div>
+    </div>
+
+    <script src='/static/design_b/design_b.js' defer></script>
+  </body>
+</html>
