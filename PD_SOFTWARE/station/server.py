@@ -183,7 +183,7 @@ async def state_socket(websocket: WebSocket) -> None:
     try:
         while True:
             await websocket.send_json(engine.snapshot())
-            await asyncio.sleep(1.0 / 20)
+            await asyncio.sleep(1.0 / 30)
     except (WebSocketDisconnect, RuntimeError):
         return
 
