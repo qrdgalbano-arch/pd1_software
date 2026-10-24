@@ -1,11 +1,11 @@
 {
-  "min_landmark_visibility": 0.5,
+  "min_landmark_visibility": 0.7,
   "tracking_loss_prompt_seconds": 1.0,
-  "deviation_confirm_seconds": 0.25,
+  "deviation_confirm_seconds": 0.40,
   "calibration_seconds": 1.5,
   "max_baseline_offset_deg": 15,
   "rom_tolerance_deg": 10,
-  "filter": { "min_cutoff": 1.2, "beta": 0.02, "d_cutoff": 1.0 },
+  "filter": { "min_cutoff": 0.8, "beta": 0.01, "d_cutoff": 1.0 },
   "exercises": {
     "straight_leg_raising": {
       "display_name": "Straight Leg Raising",
@@ -18,7 +18,7 @@
       "rest_max_deg": 15,
       "rep_start_deg": 25,
       "incomplete_below_deg": 40,
-      "max_speed_dps": 150,
+      "max_speed_dps": 220,
       "required_joints": ["hip", "knee"],
       "instructions": [
         "Lie on your back with the other knee bent.",
@@ -26,7 +26,8 @@
         "Lift the leg slowly, then lower it to the mat."
       ],
       "deviations": [
-        { "id": "knee_bent", "joint": "knee", "op": ">", "value": 15, "message": "Keep your knee straight." }
+        { "id": "knee_bent", "joint": "knee", "op": ">", "value": 15, "message": "Keep your knee straight." },
+        { "id": "wrong_leg_raised", "joint": "hip", "op": "==", "value": 0, "message": "Wrong leg: raise your prescribed leg." }
       ]
     },
     "side_leg_lifts": {

@@ -1,0 +1,33 @@
+body {
+  color: #1f2937;
+}
+
+.login-panel {
+  max-width: 32rem;
+  padding-top: 8vh;
+}
+
+.navbar-brand {
+  color: #0d6efd;
+}
+
+.patient-search {
+  min-width: min(100%, 20rem);
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+.prescription-card {
+  border-left: 4px solid #0d6efd;
+}
+
+.flag-message {
+  white-space: pre-wrap;
+}
+
+#session-status-chart {
+  max-height: 20rem;
+}

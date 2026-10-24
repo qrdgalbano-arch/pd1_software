@@ -18,7 +18,8 @@ LANDMARKS = {
 class Point:
     x: float  # pixels
     y: float  # pixels
-    visibility: float
+    z: float = 0.0
+    visibility: float = 0.0
 
 
 class PoseEstimator:
@@ -52,7 +53,7 @@ class PoseEstimator:
 
         height, width = frame_bgr.shape[:2]
         return {
-            str(index): Point(lm.x * width, lm.y * height, float(lm.visibility or 0.0))
+            str(index): Point(lm.x * width, lm.y * height, float(lm.z or 0.0), float(lm.visibility or 0.0))
             for index, lm in enumerate(result.pose_landmarks[0])
         }
 
