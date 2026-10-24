@@ -4,7 +4,6 @@ param(
     [switch]$Reload
 )
 $ErrorActionPreference = "Stop"
-$PSNativeCommandUseErrorActionPreference = $true
 $root = Split-Path -Parent $PSScriptRoot
 
 Get-Content "$root\.env" | ForEach-Object {
@@ -15,7 +14,8 @@ Get-Content "$root\.env" | ForEach-Object {
 
 Set-Location "$root\backend"
 & ".\venv\Scripts\python.exe" -m alembic upgrade head
+if ($LASTEXITCODE -ne 0) { throw "FAILED: alembic" }
 
-$args = @("-m", "uvicorn", "app.main:app", "--host", $HostAddress, "--port", $Port, "--proxy-headers")
-if ($Reload) { $args += "--reload" }
-& ".\venv\Scripts\python.exe" @args
+$uvArgs = @("-m", "uvicorn", "app.main:app", "--host", $HostAddress, "--port", $Port, "--proxy-headers")
+if ($Reload) { $uvArgs += "--reload" }
+& ".\venv\Scripts\python.exe" @uvArgs
