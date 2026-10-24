@@ -4,6 +4,8 @@
 - Observable deviations checked on the other joint twins.
 - AROM classification against the reference ROM standard:
     Straight leg raising 0-80 deg, Side leg lifts 0-45 deg, Prone leg flexion 0-135 deg.
+- Optional per-exercise "primary_sign" (default 1) multiplies the primary joint angle,
+  so a negative angle such as ankle plantarflexion can drive the repetition state machine.
 """
 
 import statistics
@@ -68,6 +70,7 @@ class ExerciseEvaluator:
         self.key = exercise_key
         self.cfg = exercise_cfg
         self.primary = exercise_cfg["primary_joint"]
+        self.sign = float(exercise_cfg.get("primary_sign", 1))
         self.rom_standard = tuple(exercise_cfg["rom_standard_deg"])
         self.tolerance = float(global_cfg.get("rom_tolerance_deg", 10))
         self.loss_prompt_s = float(global_cfg.get("tracking_loss_prompt_seconds", 1.0))
@@ -169,7 +172,7 @@ class ExerciseEvaluator:
         if self.prompt and self.prompt.id == "positioning":
             self._say("tracking_ok", "Tracking restored. Continue the exercise.", "info")
 
-        angle = primary.angle or 0.0
+        angle = (primary.angle or 0.0) * self.sign
         confirmed = self._check_deviations(joints, t)
         for dev in confirmed - self._active_deviations:
             self.deviation_counts[dev] = self.deviation_counts.get(dev, 0) + 1

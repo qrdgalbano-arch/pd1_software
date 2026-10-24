@@ -73,6 +73,27 @@
       "deviations": [
         { "id": "thigh_lifted", "joint": "hip", "op": ">", "value": 15, "message": "Keep your thigh flat on the mat." }
       ]
+    },
+    "ankle_pump": {
+      "display_name": "Ankle Pump",
+      "backend_names": ["ankle pump", "ankle pumps", "ankle pumping"],
+      "posture": "supine",
+      "camera_view": "Place the camera at the side of the mat, level with the ankle.",
+      "primary_joint": "ankle",
+      "primary_sign": -1,
+      "hip_motion": "flexion",
+      "rom_standard_deg": [0, 40],
+      "rest_max_deg": 8,
+      "rep_start_deg": 15,
+      "incomplete_below_deg": 20,
+      "max_speed_dps": 200,
+      "required_joints": ["ankle"],
+      "instructions": [
+        "Lie on your back with your legs straight and relaxed.",
+        "Point your toes away from you, then pull them back toward your shin.",
+        "Move smoothly and repeat without rushing."
+      ],
+      "deviations": []
     }
   }
 }

@@ -1,384 +1,111 @@
+// Design B working prototype: talks to the real station API (no simulation).
 (() => {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const LIVE = new URLSearchParams(location.search).has('live');
 
-  // Target angles are placeholders until clinical staff confirm them.
-  // stationKey/joint link to the existing station pipeline (live mode only).
-  const EXERCISES = [
-    {
-      key: 'straight_leg_raise',
-      stationKey: 'straight_leg_raising',
-      joint: 'hip',
-      name: 'Straight Leg Raise',
-      sets: 3, reps: 10, target: 60, rest: 10, frequency: 'Daily',
-      steps: [
-        'Lie down flat on your back with one knee bent and the other leg kept completely straight.',
-        'Tighten your thigh muscle on the straight leg and slowly lift it about 12 inches.',
-        'Hold for 3 seconds, then slowly lower the straight leg back to the floor.',
-      ],
-    },
-    {
-      key: 'prone_leg_flexion',
-      stationKey: 'prone_leg_flexion',
-      joint: 'knee',
-      name: 'Prone Leg Flexion',
-      sets: 3, reps: 10, target: 90, rest: 20, frequency: 'Daily',
-      steps: [
-        'Lie face down on a firm surface with both legs straight.',
-        'Keep your thigh on the surface and slowly bend the knee, bringing your heel toward you.',
-        'Hold for 3 seconds, then slowly lower your foot back down.',
-      ],
-    },
-    {
-      key: 'ankle_pump',
-      stationKey: null,
-      joint: null,
-      name: 'Ankle Pump',
-      sets: 3, reps: 10, target: 30, rest: 5, frequency: 'Daily',
-      steps: [
-        'Lie or sit with your legs straight and relaxed.',
-        'Point your toes away from you as far as is comfortable, then pull them back toward your shin.',
-        'Move smoothly and repeat without rushing.',
-      ],
-    },
-  ];
+  // The prescription has no 'sets' field, so sets per leg is set here.
+  // Each set is one real station session (one prescription, one leg).
+  const SETS_PER_SIDE = 3;
+  const ORDER = ['straight_leg_raising', 'prone_leg_flexion', 'ankle_pump'];
+  const SCREENS = ['patient', 'list', 'instr', 'rec', 'done', 'sync'];
 
-  const KEY_S = 'pdb_sessions_v1';
-  const KEY_L = 'pdb_last_synced_v1';
-  const PERIOD = 4;
-
-  function loadSessions() {
-    try { return JSON.parse(localStorage.getItem(KEY_S) || '[]'); }
-    catch (e) { return []; }
-  }
-  const state = {
-    patientId: null,
-    patientName: null,
-    sessions: loadSessions(),
-    lastSynced: localStorage.getItem(KEY_L),
-    syncing: false,
+  const S = {
+    patient: null,
+    prescriptions: {},
+    exercises: {},
+    sessions: [],
+    latest: null,
+    connected: false,
+    flow: null,
+    avatar: null,
+    avatarLoading: false,
+    voice: true,
+    lastPromptKey: '',
+    cameraFailed: false,
   };
-  function save() {
-    localStorage.setItem(KEY_S, JSON.stringify(state.sessions));
-    if (state.lastSynced) localStorage.setItem(KEY_L, state.lastSynced);
-  }
+  let current = 'patient';
+  let syncBack = 'list';
 
+  // ---------------------------------------------------------- helpers
   const pad = (n) => String(n).padStart(2, '0');
-  const mmss = (s) => pad(Math.floor(s / 60)) + ':' + pad(s % 60);
-  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const mmss = (s) => {
+    const t = Math.max(0, Math.floor(Number(s) || 0));
+    return pad(Math.floor(t / 60)) + ':' + pad(t % 60);
+  };
+  const cap = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+  const titleCase = (v) => String(v || '').split('_').map(cap).join(' ');
   const clock = (d) => {
     const h = d.getHours() % 12 || 12;
     return h + ':' + pad(d.getMinutes()) + ' ' + (d.getHours() >= 12 ? 'PM' : 'AM');
   };
   const dateText = (d) =>
     d.toLocaleDateString(undefined, { weekday: 'long', month: 'numeric', day: 'numeric', year: '2-digit' });
+  const deg = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) + '°' : '—');
+  const exName = (k) => (S.exercises[k] && S.exercises[k].display_name) || titleCase(k);
 
-  function pending() { return state.sessions.filter((s) => !s.synced); }
-
-  function completedToday() {
-    const map = {};
-    const now = new Date();
-    for (const s of state.sessions) {
-      if (!s.completed || s.patientId !== state.patientId) continue;
-      const d = new Date(s.recordedAt);
-      if (d.toDateString() !== now.toDateString()) continue;
-      if (!map[s.exerciseKey] || d > map[s.exerciseKey]) map[s.exerciseKey] = d;
+  async function api(path, options) {
+    const opts = options || {};
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 15000);
+    try {
+      const r = await fetch(path, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        signal: c.signal,
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(typeof body.detail === 'string' ? body.detail : r.status + ' ' + r.statusText);
+      }
+      return body;
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('The station took too long to respond.');
+      throw e;
+    } finally {
+      clearTimeout(t);
     }
-    return map;
-  }
-  function nextIndex() {
-    const done = completedToday();
-    const i = EXERCISES.findIndex((e) => !done[e.key]);
-    return i < 0 ? EXERCISES.length : i;
   }
 
-  // ---------------------------------------------------------- navigation
-  const SCREENS = ['patient', 'list', 'instr', 'rec', 'done', 'sync'];
-  let current = 'patient';
-  let syncBack = 'list';
-
-  function show(name) {
-    current = name;
-    for (const s of SCREENS) $('s-' + s).hidden = s !== name;
-    $('who').hidden = !state.patientId;
-    $('btn-sync-top').hidden = !state.patientId;
-    const h = document.querySelector('#s-' + name + ' h1');
-    if (h) h.focus({ preventScroll: true });
-    window.scrollTo(0, 0);
-  }
   function notice(msg, level) {
     const el = $('notice');
     el.textContent = msg || '';
     el.className = 'notice ' + (level || 'info');
     el.hidden = !msg;
   }
-  function updateTop() {
-    $('pending-count').textContent = String(pending().length);
-    if (state.patientId) {
-      $('who').textContent = state.patientName
-        ? state.patientName + ' (ID ' + state.patientId + ')'
-        : 'ID ' + state.patientId;
-    }
+
+  function speak(text) {
+    if (!S.voice || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.9;
+    window.speechSynthesis.speak(u);
   }
 
-  // ---------------------------------------------------------- 1. patient ID
-  async function lookupPatients() {
-    const c = new AbortController();
-    const t = setTimeout(() => c.abort(), 3000);
-    try {
-      const r = await fetch('/api/patients', { signal: c.signal });
-      if (!r.ok) return null;
-      const b = await r.json();
-      return Array.isArray(b.patients) ? b.patients : null;
-    } catch (e) {
-      return null;
-    } finally {
-      clearTimeout(t);
-    }
+  function coaching(text, level) {
+    const lv = ['info', 'success', 'warning', 'error'].includes(level) ? level : 'info';
+    $('prompt').className = 'prompt ' + lv;
+    $('prompt-symbol').textContent = { success: '✓', warning: '!', error: '!', info: '●' }[lv];
+    if ($('prompt-text').textContent !== text) $('prompt-text').textContent = text;
   }
 
-  $('f-patient').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = $('in-patient').value.trim().toUpperCase();
-    const err = $('err-patient');
-    err.hidden = true;
-    if (!/^[A-Z0-9-]{1,20}$/.test(id)) {
-      err.textContent = 'Enter a valid Patient ID (letters, numbers, or dashes).';
-      err.hidden = false;
-      return;
-    }
-    const list = await lookupPatients();
-    let name = null;
-    if (list && list.length) {
-      const p = list.find((x) => String(x.id).toUpperCase() === id);
-      if (!p) {
-        err.textContent = 'Patient ID not found on this station.';
-        err.hidden = false;
-        return;
-      }
-      name = p.full_name || null;
-      notice();
+  function show(name) {
+    current = name;
+    for (const s of SCREENS) $('s-' + s).hidden = s !== name;
+    $('who').hidden = !S.patient;
+    $('btn-sync-top').hidden = !S.patient;
+    if (name === 'rec') {
+      S.cameraFailed = false;
+      $('camera').src = '/video.mjpg?view=' + Date.now();
+      initAvatar();
     } else {
-      notice('Station patient list unavailable. The ID format was accepted but not verified.', 'warn');
+      $('camera').removeAttribute('src');
     }
-    state.patientId = id;
-    state.patientName = name;
-    updateTop();
-    renderList();
-    show('list');
-  });
-
-  // ---------------------------------------------------------- 2. exercise list
-  function renderList() {
-    $('t-list').textContent = dateText(new Date());
-    $('list-sub').textContent =
-      'Patient ' + state.patientId + (state.patientName ? ' - ' + state.patientName : '');
-    const done = completedToday();
-    const next = nextIndex();
-    const ol = $('list');
-    ol.replaceChildren();
-    EXERCISES.forEach((ex, i) => {
-      const isDone = !!done[ex.key];
-      const active = i === next;
-      const locked = !isDone && !active;
-      const li = document.createElement('li');
-      li.className = 'item' + (locked ? ' locked' : '') + (active ? ' active' : '');
-      const num = document.createElement('span');
-      num.className = 'num';
-      num.textContent = String(i + 1);
-      const body = document.createElement('div');
-      body.className = 'grow';
-      const b = document.createElement('b');
-      b.textContent = ex.name;
-      const small = document.createElement('small');
-      small.textContent = ex.sets + ' sets × ' + ex.reps + ' reps' +
-        (locked ? ' - Locked: finish the previous exercise first' : '');
-      body.append(b, small);
-      li.append(num, body);
-      if (isDone) {
-        const s = document.createElement('span');
-        s.className = 'done';
-        s.textContent = '✓ ' + clock(done[ex.key]);
-        li.append(s);
-      } else if (active) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn primary small';
-        btn.textContent = 'Record';
-        btn.setAttribute('aria-label', 'Record ' + ex.name);
-        btn.addEventListener('click', () => openInstr(ex));
-        li.append(btn);
-      } else {
-        const s = document.createElement('span');
-        s.className = 'dash';
-        s.textContent = '—';
-        s.setAttribute('aria-label', 'Not done');
-        li.append(s);
-      }
-      ol.append(li);
-    });
-    $('list-done').hidden = next < EXERCISES.length;
+    const h = document.querySelector('#s-' + name + ' h1');
+    if (h) h.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
   }
 
-  // ---------------------------------------------------------- 3. instructions
-  function openInstr(ex) {
-    $('t-instr').textContent = ex.name;
-    $('i-presc').textContent = ex.sets + ' Sets × ' + ex.reps + ' Reps';
-    $('i-freq').textContent = ex.frequency;
-    $('i-steps').replaceChildren(
-      ...ex.steps.map((t) => {
-        const li = document.createElement('li');
-        li.textContent = t;
-        return li;
-      })
-    );
-    $('btn-start').onclick = () => startRecording(ex);
-    show('instr');
-  }
-  $('instr-back').addEventListener('click', () => show('list'));
-
-  // ---------------------------------------------------------- 4. recording
-  let rec = null;
-  let rafId = null;
-  let lastT = 0;
-  const live = { joints: null };
-
-  function setPreview() {
-    if (!LIVE || !rec || !rec.ex.stationKey) return;
-    fetch('/api/preview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exercise_key: rec.ex.stationKey, side: rec.side }),
-    }).catch(() => {});
-  }
-
-  function startRecording(ex) {
-    rec = {
-      ex, side: 'left', set: 1, reps: 0, total: 0, setsDone: 0,
-      cycle: 0, elapsed: 0, paused: false, prompting: false,
-      up: false, angle: 0, reached: false, source: 'sim',
-    };
-    setPreview();
-    $('t-rec').textContent = ex.name;
-    $('btn-pause').textContent = 'Pause';
-    updateHud();
-    show('rec');
-    lastT = performance.now();
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(loop);
-  }
-
-  function repDone() {
-    rec.reps += 1;
-    rec.total += 1;
-    if (rec.reps >= rec.ex.reps) setComplete();
-  }
-
-  function loop(now) {
-    if (!rec) return;
-    const dt = Math.min(0.1, (now - lastT) / 1000);
-    lastT = now;
-    if (!rec.paused && !rec.prompting) {
-      rec.elapsed += dt;
-      const jt = LIVE && rec.ex.joint && live.joints ? live.joints[rec.ex.joint] : null;
-      if (jt && jt.tracked && typeof jt.angle === 'number') {
-        rec.source = 'live';
-        rec.angle = Math.max(0, jt.angle);
-        if (rec.angle >= rec.ex.target * 0.85) {
-          rec.up = true;
-        } else if (rec.up && rec.angle <= rec.ex.rest) {
-          rec.up = false;
-          repDone();
-        }
-      } else {
-        rec.source = 'sim';
-        rec.cycle += dt;
-        if (rec.cycle >= PERIOD) {
-          rec.cycle -= PERIOD;
-          repDone();
-        }
-        if (rec) {
-          const peak = rec.ex.target * (1 + 0.04 * Math.sin(rec.reps * 1.7));
-          rec.angle = peak * (0.5 - 0.5 * Math.cos((2 * Math.PI * rec.cycle) / PERIOD));
-        }
-      }
-      if (rec) rec.reached = rec.angle >= rec.ex.target * 0.9;
-    }
-    if (!rec) return;
-    draw();
-    updateHud();
-    rafId = requestAnimationFrame(loop);
-  }
-
-  function updateHud() {
-    const ex = rec.ex;
-    $('r-side').textContent = cap(rec.side) + ' leg';
-    $('r-set').textContent = rec.set + ' of ' + ex.sets;
-    $('r-time').textContent = mmss(Math.round(rec.elapsed));
-    $('r-angle').textContent = Math.round(rec.angle) + '°';
-    $('r-state').textContent = rec.reached ? 'Target reached' : 'Keep moving';
-    $('r-reps').textContent = 'Rep ' + rec.reps + ' / ' + ex.reps;
-    $('r-fill').style.width = (rec.reps / ex.reps) * 100 + '%';
-    $('r-bar').setAttribute('aria-valuemax', String(ex.reps));
-    $('r-bar').setAttribute('aria-valuenow', String(rec.reps));
-    const isLive = rec.source === 'live';
-    $('r-source').textContent = isLive ? 'LIVE STATION DATA' : 'SIMULATED DATA';
-    $('r-source').className = 'badge ' + (isLive ? 'ok' : 'warn');
-  }
-
-  // Digital twin: draws ONLY the active leg (left or right).
-  function pose(deg) {
-    const dir = rec.side === 'left' ? 1 : -1;
-    const hip = { x: dir > 0 ? 80 : 520, y: 270 };
-    const th = 130, sh = 120, ft = 40;
-    const r = (deg * Math.PI) / 180;
-    const unit = (a) => ({ x: dir * Math.cos(a), y: -Math.sin(a) });
-    const perp = (d) => ({ x: dir * d.y, y: -dir * d.x });
-    const add = (p, d, l) => ({ x: p.x + d.x * l, y: p.y + d.y * l });
-    const flat = { x: dir, y: 0 };
-    let knee, ankle, toe;
-    if (rec.ex.key === 'straight_leg_raise') {
-      const d = unit(r);
-      knee = add(hip, d, th);
-      ankle = add(knee, d, sh);
-      toe = add(ankle, perp(d), ft);
-    } else if (rec.ex.key === 'prone_leg_flexion') {
-      knee = add(hip, flat, th);
-      const d = unit(r);
-      ankle = add(knee, d, sh);
-      toe = add(ankle, perp(d), ft);
-    } else {
-      knee = add(hip, flat, th);
-      ankle = add(knee, flat, sh);
-      const p = perp(flat);
-      const fd = { x: p.x * Math.cos(r) + flat.x * Math.sin(r), y: p.y * Math.cos(r) + flat.y * Math.sin(r) };
-      toe = add(ankle, fd, ft);
-    }
-    return { hip, knee, ankle, toe };
-  }
-  function seg(a, b, color, w) {
-    return "<line x1='" + a.x + "' y1='" + a.y + "' x2='" + b.x + "' y2='" + b.y +
-      "' stroke='" + color + "' stroke-width='" + w + "' stroke-linecap='round'/>";
-  }
-  function draw() {
-    const g = pose(rec.ex.target);
-    const p = pose(rec.angle);
-    const col = rec.reached ? '#2e7d4f' : '#f2b632';
-    let h = "<rect x='20' y='292' width='560' height='10' rx='5' fill='#bddcce'/>";
-    h += seg(g.hip, g.knee, '#bddcce', 8) + seg(g.knee, g.ankle, '#bddcce', 8) + seg(g.ankle, g.toe, '#bddcce', 8);
-    h += seg(p.hip, p.knee, '#0f4c3a', 12) + seg(p.knee, p.ankle, '#0f4c3a', 12) + seg(p.ankle, p.toe, '#0f4c3a', 8);
-    const joints = [['hip', p.hip], ['knee', p.knee], ['ankle', p.ankle]];
-    for (const [n, j] of joints) {
-      h += "<circle cx='" + j.x + "' cy='" + j.y + "' r='14' fill='#fff'/>" +
-        "<circle cx='" + j.x + "' cy='" + j.y + "' r='10' fill='" + col + "'/>" +
-        "<text x='" + j.x + "' y='" + (j.y + 30) + "' text-anchor='middle' font-size='13' fill='#5e7a6f'>" + n + '</text>';
-    }
-    $('twin').innerHTML = h;
-  }
-
-  // ---------------------------------------------------------- 5. prompts
   function modal(opts) {
     return new Promise((resolve) => {
       $('m-title').textContent = opts.title;
@@ -401,92 +128,482 @@
     });
   }
 
-  async function setComplete() {
-    const r = rec;
-    const ex = r.ex;
-    const last = r.set >= ex.sets;
-    const isFinal = last && r.side === 'right';
-    r.prompting = true;
-    r.setsDone += 1;
-    if (isFinal) {
-      finish(true);
+  // ---------------------------------------------------------- 3D digital twin (avatar.js)
+  async function initAvatar() {
+    if (S.avatar) {
+      S.avatar.resize();
       return;
     }
-    await modal(
-      last
-        ? { title: cap(r.side) + ' Leg Complete!', body: 'Rest, then switch to your right leg.', ok: 'Start Right Leg' }
-        : {
-            title: 'Set ' + r.set + ' Complete!',
-            body: ex.reps + ' / ' + ex.reps + ' reps on the ' + r.side + ' leg. Rest before beginning your next set.',
-            ok: 'Start Set ' + (r.set + 1),
-          }
-    );
-    if (rec !== r) return;
-    if (last) {
-      r.side = 'right';
-      r.set = 1;
-      setPreview();
-    } else {
-      r.set += 1;
+    if (S.avatarLoading) return;
+    S.avatarLoading = true;
+    try {
+      const mod = await import('/static/avatar.js');
+      const a = new mod.TwinAvatar($('avatar'));
+      await a.load();
+      a.resize();
+      a.setTheme(false);
+      S.avatar = a;
+      $('avatar-error').hidden = true;
+    } catch (e) {
+      $('avatar-error').hidden = false;
+      console.warn('PD1 avatar:', e);
+    } finally {
+      S.avatarLoading = false;
     }
-    r.reps = 0;
-    r.cycle = 0;
-    r.up = false;
-    r.prompting = false;
-    lastT = performance.now();
   }
 
-  $('btn-pause').addEventListener('click', () => {
-    if (!rec || rec.prompting) return;
-    rec.paused = !rec.paused;
-    $('btn-pause').textContent = rec.paused ? 'Resume' : 'Pause';
-    lastT = performance.now();
+  // ---------------------------------------------------------- station data
+  async function loadExercises() {
+    try {
+      S.exercises = await api('/api/exercises');
+    } catch (e) {
+      S.exercises = {};
+    }
+  }
+  async function refreshSessions() {
+    try {
+      S.sessions = await api('/api/sessions?limit=200');
+    } catch (e) {
+      /* keep previous list */
+    }
+  }
+
+  // Progress today for this patient, from the station's saved sessions.
+  function progress(key) {
+    const out = { left: 0, right: 0 };
+    const today = new Date().toDateString();
+    for (const s of S.sessions) {
+      if (String(s.patient_id) !== String(S.patient.id)) continue;
+      if (s.exercise_key !== key || s.status !== 'completed') continue;
+      if (new Date(s.device_recorded_at).toDateString() !== today) continue;
+      if (out[s.affected_side] !== undefined) out[s.affected_side] += 1;
+    }
+    return out;
+  }
+  function isDone(key) {
+    const p = progress(key);
+    return p.left >= SETS_PER_SIDE && p.right >= SETS_PER_SIDE;
+  }
+  function doneAt(key) {
+    let latest = null;
+    const today = new Date().toDateString();
+    for (const s of S.sessions) {
+      if (String(s.patient_id) !== String(S.patient.id)) continue;
+      if (s.exercise_key !== key || s.status !== 'completed') continue;
+      const d = new Date(s.device_recorded_at);
+      if (d.toDateString() !== today) continue;
+      if (!latest || d > latest) latest = d;
+    }
+    return latest;
+  }
+  function nextKey() {
+    for (const k of ORDER) {
+      if (!S.prescriptions[k]) continue;
+      if (!isDone(k)) return k;
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------- 1. patient ID
+  $('f-patient').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('err-patient');
+    err.hidden = true;
+    const id = $('in-patient').value.trim();
+    if (!/^[0-9]+$/.test(id)) {
+      err.textContent = 'Enter your numeric Patient ID.';
+      err.hidden = false;
+      return;
+    }
+    $('btn-patient').disabled = true;
+    try {
+      const data = await api('/api/patients');
+      const p = (data.patients || []).find((x) => String(x.id) === id);
+      if (!p) {
+        err.textContent = 'Patient ID not found on this station.';
+        err.hidden = false;
+        return;
+      }
+      const pr = await api('/api/patients/' + encodeURIComponent(id) + '/prescriptions');
+      S.prescriptions = {};
+      for (const item of pr.prescriptions || []) {
+        if (!S.prescriptions[item.exercise_key]) S.prescriptions[item.exercise_key] = item;
+      }
+      S.patient = p;
+      const cached = data.source === 'cache' || pr.source === 'cache';
+      notice(cached ? 'Backend unavailable. Using the station cached patients and prescriptions.' : '', 'warn');
+      await refreshSessions();
+      updateWho();
+      renderList();
+      show('list');
+    } catch (ex) {
+      err.textContent = 'Cannot load this patient: ' + ex.message;
+      err.hidden = false;
+    } finally {
+      $('btn-patient').disabled = false;
+    }
   });
 
-  $('btn-end').addEventListener('click', async () => {
-    if (!rec || rec.prompting) return;
-    const r = rec;
-    const was = r.paused;
-    r.paused = true;
+  function updateWho() {
+    if (!S.patient) return;
+    $('who').textContent = (S.patient.full_name || 'Patient') + ' (ID ' + S.patient.id + ')';
+  }
+
+  // ---------------------------------------------------------- 2. exercise list
+  function renderList() {
+    $('t-list').textContent = dateText(new Date());
+    $('list-sub').textContent = (S.patient.full_name || 'Patient') + ' - ID ' + S.patient.id;
+    const next = nextKey();
+    const ol = $('list');
+    ol.replaceChildren();
+    ORDER.forEach((key, i) => {
+      const p = S.prescriptions[key];
+      const done = p && isDone(key);
+      const active = key === next;
+      const prog = progress(key);
+      const li = document.createElement('li');
+      li.className = 'item' + (!p || (!done && !active) ? ' locked' : '') + (active ? ' active' : '');
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = String(i + 1);
+      const body = document.createElement('div');
+      body.className = 'grow';
+      const b = document.createElement('b');
+      b.textContent = exName(key);
+      const small = document.createElement('small');
+      if (!p) {
+        small.textContent = 'Not prescribed. Ask staff to prescribe it.';
+      } else {
+        let t = SETS_PER_SIDE + ' sets × ' + p.repetitions_target + ' reps per leg';
+        if (!done && (prog.left > 0 || prog.right > 0)) {
+          t += ' - progress: left ' + Math.min(prog.left, SETS_PER_SIDE) + '/' + SETS_PER_SIDE +
+            ', right ' + Math.min(prog.right, SETS_PER_SIDE) + '/' + SETS_PER_SIDE;
+        }
+        if (!done && !active) t += ' - Locked: finish the previous exercise first';
+        small.textContent = t;
+      }
+      body.append(b, small);
+      li.append(num, body);
+      if (done) {
+        const s = document.createElement('span');
+        s.className = 'done';
+        const d = doneAt(key);
+        s.textContent = '✓ ' + (d ? clock(d) : '');
+        li.append(s);
+      } else if (active) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn primary small';
+        btn.textContent = 'Record';
+        btn.setAttribute('aria-label', 'Record ' + exName(key));
+        btn.addEventListener('click', () => openInstr(key));
+        li.append(btn);
+      } else {
+        const s = document.createElement('span');
+        s.className = 'dash';
+        s.textContent = '—';
+        s.setAttribute('aria-label', 'Not done');
+        li.append(s);
+      }
+      ol.append(li);
+    });
+    $('list-done').hidden = next !== null || !ORDER.some((k) => S.prescriptions[k]);
+  }
+
+  // ---------------------------------------------------------- 3. instructions
+  function openInstr(key) {
+    const p = S.prescriptions[key];
+    const cfg = S.exercises[key] || {};
+    $('t-instr').textContent = exName(key);
+    $('i-presc').textContent = SETS_PER_SIDE + ' Sets × ' + p.repetitions_target + ' Reps';
+    $('i-time').textContent = mmss(p.duration_limit_seconds);
+    $('i-freq').textContent = p.frequency || 'Daily';
+    $('i-view').textContent = cfg.camera_view || '';
+    $('i-steps').replaceChildren(
+      ...(cfg.instructions || []).map((t) => {
+        const li = document.createElement('li');
+        li.textContent = t;
+        return li;
+      })
+    );
+    $('btn-start').onclick = () => beginExercise(key);
+    show('instr');
+  }
+  $('instr-back').addEventListener('click', () => show('list'));
+
+  // ---------------------------------------------------------- 4. recording (real sessions)
+  function beginExercise(key) {
+    const p = S.prescriptions[key];
+    const prog = progress(key);
+    const f = {
+      key, p, side: 'left', set: 1, results: [],
+      sessionId: null, handling: false, userEnded: false,
+    };
+    if (prog.left < SETS_PER_SIDE) {
+      f.side = 'left';
+      f.set = prog.left + 1;
+    } else {
+      f.side = 'right';
+      f.set = prog.right + 1;
+    }
+    S.flow = f;
+    startSet(true);
+  }
+
+  async function startSet(first) {
+    const f = S.flow;
+    f.handling = false;
+    f.userEnded = false;
+    S.lastPromptKey = '';
+    try {
+      const r = await api('/api/session/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          patient_id: Number(S.patient.id),
+          prescription_id: Number(f.p.id),
+          side: f.side,
+        }),
+      });
+      f.sessionId = r.client_session_id;
+      notice('');
+      coaching('Hold still in the starting position.', 'info');
+      show('rec');
+      if (S.latest) renderRec(S.latest);
+    } catch (e) {
+      notice('Cannot start the set: ' + e.message, 'error');
+      if (first) {
+        S.flow = null;
+        show('instr');
+      } else {
+        await refreshSessions();
+        renderList();
+        S.flow = null;
+        show('list');
+      }
+    }
+  }
+
+  function renderRec(s) {
+    const f = S.flow;
+    if (!f) return;
+    const ex = s.exercise;
+    const sess = s.session;
+    const ev = s.evaluation;
+    const cfg = S.exercises[f.key] || {};
+    $('t-rec').textContent = ex.name;
+    $('r-side').textContent = cap(f.side) + ' leg';
+    $('r-leg').textContent = cap(f.side) + ' leg';
+    $('r-set').textContent = f.set + ' of ' + SETS_PER_SIDE;
+    $('r-phase').textContent = titleCase(s.phase);
+
+    const target = sess ? Number(sess.repetitions_target) || 0 : Number(f.p.repetitions_target) || 0;
+    const valid = Number(ev && ev.valid) || 0;
+    $('r-reps').textContent = 'Valid reps ' + Math.min(valid, target) + ' / ' + target;
+    $('r-fill').style.width = (target ? Math.min(100, (valid / target) * 100) : 0) + '%';
+    $('r-bar').setAttribute('aria-valuemax', String(target || 1));
+    $('r-bar').setAttribute('aria-valuenow', String(Math.min(valid, target || 1)));
+    $('r-time').textContent = sess ? mmss(sess.duration_limit_seconds - sess.elapsed_seconds) : '--:--';
+
+    const paused = s.phase === 'paused';
+    $('btn-pause').textContent = paused ? 'Resume' : 'Pause';
+    $('btn-pause').disabled = !sess;
+    $('btn-stop').disabled = !sess;
+
+    const camMsg = s.camera_error
+      ? 'Camera unavailable: ' + s.camera_error + '. Stop moving and ask staff to check the camera.'
+      : S.cameraFailed
+        ? 'Camera preview unavailable. Ask staff to check the station camera.'
+        : '';
+    $('camera-error').hidden = !camMsg;
+    $('camera-error').textContent = camMsg;
+
+    if (paused) {
+      coaching('Set paused. Rest, then select Resume.', 'warning');
+    } else if (camMsg) {
+      coaching('Camera unavailable. Stop moving and ask staff for help.', 'error');
+    } else if (ev && ev.prompt) {
+      const key = f.sessionId + ':' + ev.prompt.seq;
+      coaching(ev.prompt.text, ev.prompt.level);
+      if (S.lastPromptKey !== key) {
+        S.lastPromptKey = key;
+        speak(ev.prompt.text);
+      }
+    }
+
+    const joints = s.joints;
+    const active = new Set((ev && ev.active_deviations) || []);
+    const devJoints = new Set(
+      (cfg.deviations || []).filter((d) => active.has(d.id)).map((d) => d.joint)
+    );
+    const statuses = {};
+    for (const [name, j] of Object.entries(joints)) {
+      statuses[name] = !j.tracked ? 'lost' : devJoints.has(name) ? 'deviation' : 'ok';
+    }
+    $('joint-chips').replaceChildren(
+      ...['hip', 'knee', 'ankle'].map((name) => {
+        const j = joints[name];
+        const span = document.createElement('span');
+        span.className = 'jchip ' + (statuses[name] || 'lost');
+        span.textContent = titleCase(name);
+        const b = document.createElement('b');
+        b.textContent = j && j.tracked ? deg(j.angle) : 'Lost';
+        span.append(b);
+        return span;
+      })
+    );
+    const primary = joints[ex.primary_joint];
+    const rom = ex.rom_standard_deg || [];
+    $('r-angle').textContent =
+      titleCase(ex.primary_joint) + ' angle: ' + (primary && primary.tracked ? deg(primary.angle) : 'not tracked') +
+      ' - reference ROM ' + (rom[0] != null ? rom[0] : '-') + ' to ' + (rom[1] != null ? rom[1] : '-') + '°';
+
+    if (S.avatar) {
+      S.avatar.update(
+        Object.fromEntries(
+          Object.entries(joints).map(([n, j]) => [n, j.tracked ? j.angle : null])
+        ),
+        statuses,
+        s.exercise,
+        s.side
+      );
+    }
+  }
+
+  $('camera').addEventListener('error', () => {
+    if (current !== 'rec') return;
+    S.cameraFailed = true;
+    if (S.latest) renderRec(S.latest);
+  });
+
+  $('btn-pause').addEventListener('click', async () => {
+    const s = S.latest;
+    if (!s || !s.session) return;
+    const resume = s.phase === 'paused';
+    try {
+      await api('/api/session/' + (resume ? 'resume' : 'pause'), { method: 'POST' });
+      if (!resume && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    } catch (e) {
+      notice('Cannot ' + (resume ? 'resume' : 'pause') + ': ' + e.message, 'error');
+    }
+  });
+
+  $('btn-stop').addEventListener('click', async () => {
+    const f = S.flow;
+    if (!f || !S.latest || !S.latest.session) return;
     const ok = await modal({
       title: 'End session?',
-      body: 'Your progress will be saved, but this exercise will stay marked as not done.',
+      body: 'Your progress for this set is saved, but this exercise stays marked as not done.',
       ok: 'End session',
       cancel: 'Keep going',
     });
-    if (rec !== r) return;
-    if (ok) finish(false);
-    else r.paused = was;
+    if (!ok) return;
+    f.userEnded = true;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    try {
+      const sum = await api('/api/session/stop', { method: 'POST' });
+      handleEnd(sum);
+    } catch (e) {
+      if (S.latest && S.latest.session) {
+        f.userEnded = false;
+        notice('Cannot stop: ' + e.message, 'error');
+      }
+    }
   });
 
+  $('btn-stop-stray').addEventListener('click', async () => {
+    try {
+      await api('/api/session/stop', { method: 'POST' });
+      notice('');
+    } catch (e) {
+      notice('Cannot stop the running session: ' + e.message, 'error');
+    }
+  });
+
+  // ---------------------------------------------------------- 5. set / leg prompts
+  function handleEnd(sum) {
+    const f = S.flow;
+    if (!f || f.handling) return;
+    f.handling = true;
+    onSetEnded(sum);
+  }
+
+  async function onSetEnded(sum) {
+    const f = S.flow;
+    f.results.push(sum);
+    await refreshSessions();
+    if (f.userEnded) {
+      finishExercise();
+      return;
+    }
+    if (sum.status === 'completed') {
+      const last = f.set >= SETS_PER_SIDE;
+      const isFinal = last && f.side === 'right';
+      if (isFinal) {
+        finishExercise();
+        return;
+      }
+      await modal(
+        last
+          ? {
+              title: cap(f.side) + ' Leg Complete!',
+              body: sum.valid_repetitions + ' valid reps. Rest, then switch to your right leg.',
+              ok: 'Start Right Leg',
+            }
+          : {
+              title: 'Set ' + f.set + ' Complete!',
+              body: sum.valid_repetitions + ' valid reps on the ' + f.side + ' leg. Rest before beginning your next set.',
+              ok: 'Start Set ' + (f.set + 1),
+            }
+      );
+      if (S.flow !== f) return;
+      if (last) {
+        f.side = 'right';
+        f.set = 1;
+      } else {
+        f.set += 1;
+      }
+      startSet(false);
+    } else {
+      const again = await modal({
+        title: 'Set ' + f.set + ' not completed',
+        body: sum.valid_repetitions + ' of ' + f.p.repetitions_target + ' valid reps before the set ended.',
+        ok: 'Repeat this set',
+        cancel: 'End exercise',
+      });
+      if (S.flow !== f) return;
+      if (again) startSet(false);
+      else finishExercise();
+    }
+  }
+
   // ---------------------------------------------------------- 6. session complete
-  function finish(completed) {
-    const r = rec;
-    cancelAnimationFrame(rafId);
-    rec = null;
-    const record = {
-      id: 'pdb-' + Date.now(),
-      patientId: state.patientId,
-      exerciseKey: r.ex.key,
-      exerciseName: r.ex.name,
-      setsCompleted: r.setsDone,
-      setsTotal: r.ex.sets * 2,
-      totalReps: r.total,
-      repsTotal: r.ex.reps * r.ex.sets * 2,
-      durationSeconds: Math.round(r.elapsed),
-      recordedAt: new Date().toISOString(),
-      completed,
-      synced: false,
-    };
-    state.sessions.unshift(record);
-    save();
-    updateTop();
-    $('t-done').textContent = completed ? 'Session Complete!' : 'Session Ended Early';
-    $('d-icon').textContent = completed ? '✓' : '!';
-    $('d-icon').className = 'big-icon' + (completed ? '' : ' warn');
-    $('d-sets').textContent = record.setsCompleted + ' / ' + record.setsTotal + ' sets';
-    $('d-reps').textContent = record.totalReps + ' / ' + record.repsTotal + ' reps';
-    $('d-dur').textContent = mmss(record.durationSeconds);
+  function finishExercise() {
+    const f = S.flow;
+    S.flow = null;
+    const prog = progress(f.key);
+    const complete = isDone(f.key);
+    let valid = 0;
+    let invalid = 0;
+    let duration = 0;
+    const lastBySide = {};
+    for (const r of f.results) {
+      valid += r.valid_repetitions || 0;
+      invalid += r.invalid_repetitions || 0;
+      duration += r.duration_seconds || 0;
+      lastBySide[r.affected_side] = r;
+    }
+    $('t-done').textContent = complete ? 'Session Complete!' : 'Session Ended Early';
+    $('d-icon').textContent = complete ? '✓' : '!';
+    $('d-icon').className = 'big-icon' + (complete ? '' : ' warn');
+    $('d-sets').textContent =
+      Math.min(prog.left, SETS_PER_SIDE) + Math.min(prog.right, SETS_PER_SIDE) + ' / ' + SETS_PER_SIDE * 2 + ' sets';
+    $('d-reps').textContent = valid + ' valid, ' + invalid + ' invalid';
+    $('d-dur').textContent = mmss(duration);
+    $('d-rom').textContent =
+      Object.entries(lastBySide)
+        .map(([sd, r]) => cap(sd) + ': ' + (r.arom_classification || 'n/a') + (r.peak_rom_degrees != null ? ' (' + deg(r.peak_rom_degrees) + ')' : ''))
+        .join('; ') || '—';
+    refreshStatus();
     show('done');
   }
   $('btn-finish').addEventListener('click', () => {
@@ -494,31 +611,28 @@
     show('list');
   });
 
-  // ---------------------------------------------------------- 7. sync status
-  async function stationStatus() {
-    try {
-      const r = await fetch('/api/status');
-      if (!r.ok) return 'unknown';
-      const b = await r.json();
-      return b.backend_online ? 'online' : 'offline';
-    } catch (e) {
-      return 'station not reachable';
-    }
-  }
+  // ---------------------------------------------------------- 7. sync status (real)
+  const syncLabel = (v) => ({ synced: 'Synced', pending: 'Pending', failed: 'Failed' }[v] || titleCase(v || 'pending'));
 
   async function renderSync() {
-    const p = pending();
-    const all = p.length === 0;
+    const [st, rows] = await Promise.all([
+      api('/api/status').catch(() => null),
+      api('/api/sessions?limit=200').catch(() => null),
+    ]);
+    if (current !== 'sync') return;
+    const pending = rows ? rows.filter((r) => r.sync_status !== 'synced') : [];
+    const all = rows !== null && pending.length === 0;
     $('y-icon').textContent = all ? '✓' : '!';
     $('y-icon').className = 'big-icon' + (all ? '' : ' warn');
-    $('y-title').textContent = all ? 'All sessions synced' : p.length + ' session(s) waiting to sync';
-    $('y-last').textContent = state.lastSynced
-      ? 'Last synced: ' + dateText(new Date(state.lastSynced)) + ', ' + clock(new Date(state.lastSynced))
-      : 'Not synced yet';
-    const all_btn = $('btn-sync-all');
-    all_btn.hidden = all;
-    all_btn.disabled = state.syncing;
-    all_btn.textContent = state.syncing ? 'Syncing...' : 'Sync all';
+    $('y-title').textContent =
+      rows === null ? 'Station not reachable' : all ? 'All sessions synced' : pending.length + ' session(s) waiting to sync';
+    let line = st ? 'Backend: ' + (st.backend_online ? 'online' : 'offline') : 'Backend status unavailable';
+    if (st && st.sync) {
+      line += ' - ' + (st.sync.synced || 0) + ' synced, ' + (st.sync.pending || 0) + ' pending, ' + (st.sync.failed || 0) + ' failed';
+    }
+    if (st && st.last_sync_error) line += ' - last error: ' + st.last_sync_error;
+    $('y-station').textContent = line;
+    $('btn-sync-all').hidden = all || rows === null;
     const ul = $('y-list');
     ul.replaceChildren();
     if (all) {
@@ -527,74 +641,119 @@
       li.textContent = 'Nothing pending.';
       ul.append(li);
     }
-    for (const s of p) {
+    for (const r of pending) {
       const li = document.createElement('li');
       const body = document.createElement('div');
       body.className = 'grow';
       const b = document.createElement('b');
-      b.textContent = s.exerciseName;
+      b.textContent = (r.exercise_name || titleCase(r.exercise_key)) + ' - ' + cap(r.affected_side) + ' leg';
       const small = document.createElement('small');
-      small.textContent = s.setsCompleted + ' sets · ' + s.totalReps + ' reps · ' + mmss(s.durationSeconds);
+      small.textContent = r.valid_repetitions + ' valid reps - ' + mmss(r.duration_seconds) +
+        (r.sync_status === 'failed' && r.sync_error ? ' - ' + r.sync_error : '');
       body.append(b, small);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn small';
-      btn.textContent = 'Sync';
-      btn.disabled = state.syncing;
-      btn.addEventListener('click', () => doSync([s.id]));
-      li.append(body, btn);
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + (r.sync_status === 'failed' ? 'danger' : 'warn');
+      badge.textContent = syncLabel(r.sync_status);
+      li.append(body, badge);
       ul.append(li);
     }
-    $('y-station').textContent = 'Station backend: ' + (await stationStatus());
   }
 
-  // Simulated upload: no data is sent anywhere in this build.
-  async function doSync(ids) {
-    if (state.syncing) return;
-    state.syncing = true;
-    renderSync();
-    await new Promise((r) => setTimeout(r, ids ? 800 : 1200));
-    for (const s of state.sessions) {
-      if (!ids || ids.includes(s.id)) s.synced = true;
+  async function syncNow() {
+    $('btn-sync-all').disabled = true;
+    try {
+      await api('/api/sync', { method: 'POST' });
+    } catch (e) {
+      notice('Sync request failed: ' + e.message, 'error');
     }
-    state.lastSynced = new Date().toISOString();
-    state.syncing = false;
-    save();
-    updateTop();
-    renderSync();
+    for (let i = 0; i < 5 && current === 'sync'; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      await renderSync();
+    }
+    $('btn-sync-all').disabled = false;
+    refreshStatus();
+  }
+
+  async function refreshStatus() {
+    try {
+      const st = await api('/api/status');
+      const n = (Number(st.sync && st.sync.pending) || 0) + (Number(st.sync && st.sync.failed) || 0);
+      $('pending-count').textContent = String(n);
+    } catch (e) {
+      /* station unreachable */
+    }
   }
 
   $('btn-sync-top').addEventListener('click', () => {
     if (current === 'rec' || current === 'sync') return;
     syncBack = current;
-    renderSync();
     show('sync');
+    renderSync();
   });
   $('sync-back').addEventListener('click', () => {
-    if (syncBack === 'list') renderList();
-    show(syncBack === 'rec' ? 'list' : syncBack);
+    if (syncBack === 'list' && S.patient) renderList();
+    show(syncBack === 'rec' || syncBack === 'sync' ? 'list' : syncBack);
   });
-  $('btn-sync-all').addEventListener('click', () => doSync(null));
+  $('btn-sync-all').addEventListener('click', syncNow);
 
   // ---------------------------------------------------------- live station link
-  function connect() {
+  function setConn() {
+    const el = $('conn');
+    el.textContent = S.connected ? 'Station connected' : 'Station disconnected';
+    el.className = 'badge ' + (S.connected ? 'ok' : 'danger');
+    if (!S.connected && S.flow && current === 'rec') {
+      coaching('Connection lost. Stop moving and ask staff to check the station.', 'error');
+    }
+  }
+
+  function onState(s) {
+    if (!s || !s.exercise || !s.joints) return;
+    S.latest = s;
+    const f = S.flow;
+    const stray = Boolean(s.session) && !(f && f.sessionId === s.session.client_session_id);
+    $('btn-stop-stray').hidden = !stray;
+    if (
+      f && f.sessionId && !s.session && s.last_summary &&
+      s.last_summary.client_session_id === f.sessionId
+    ) {
+      handleEnd(s.last_summary);
+    }
+    if (current === 'rec') renderRec(s);
+  }
+
+  function connectSocket() {
     const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws/state');
+    ws.onopen = () => {
+      S.connected = true;
+      setConn();
+    };
     ws.onmessage = (e) => {
-      try { live.joints = JSON.parse(e.data).joints || null; } catch (_) { /* ignore */ }
+      try {
+        onState(JSON.parse(e.data));
+      } catch (err) {
+        console.warn('PD1 state:', err);
+      }
     };
     ws.onclose = () => {
-      live.joints = null;
-      setTimeout(connect, 2000);
+      S.connected = false;
+      setConn();
+      setTimeout(connectSocket, 2000);
     };
     ws.onerror = () => ws.close();
   }
-  if (LIVE) {
-    $('mode').textContent = 'Station live (hip/knee exercises)';
-    $('mode').className = 'badge ok';
-    connect();
-  }
 
-  updateTop();
+  $('btn-voice').addEventListener('click', () => {
+    S.voice = !S.voice;
+    $('btn-voice').textContent = S.voice ? 'Voice on' : 'Voice off';
+    $('btn-voice').setAttribute('aria-pressed', String(S.voice));
+    if (!S.voice && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  });
+
+  // ---------------------------------------------------------- start
+  loadExercises();
+  connectSocket();
+  refreshStatus();
+  setInterval(refreshStatus, 5000);
   show('patient');
   $('in-patient').focus();
 })();
