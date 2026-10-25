@@ -442,6 +442,9 @@ function notice(message = "", level = "info") {
 
 
 function speak(text) {
+  const nowMs = Date.now();
+  if (window.__pd1Speech && nowMs - window.__pd1Speech < 3500 && !/paused|resumed|finished|camera/i.test(text)) return;
+  window.__pd1Speech = nowMs;
 
 
 
@@ -3264,7 +3267,7 @@ function render(state) {
 
 
 
-        if (ev.prompt.level !== "success" && performance.now() - (window.__lastCoachSpeak || 0) > 3500) { window.__lastCoachSpeak = performance.now(); speak(ev.prompt.text); }
+        if (ev.prompt.level !== "success" && performance.now() - (window.__lastCoachSpeak || 0) > 3500) { window.__lastCoachSpeak = performance.now(); if (["warning", "error"].includes(ev.prompt.level)) speak(ev.prompt.text); }
 
 
 
