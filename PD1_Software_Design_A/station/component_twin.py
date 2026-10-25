@@ -83,8 +83,8 @@ class JointComponentTwin:
 
     HOLD_BAND_DEG = 5.0
     HOLD_MAX_SPEED_DPS = 20.0
-    POINT_FILTER = {"min_cutoff": 1.0, "beta": 0.007, "d_cutoff": 1.0}
-    MAX_JUMP_DPS = 600.0
+    POINT_FILTER = {"min_cutoff": 0.6, "beta": 0.01, "d_cutoff": 1.0}
+    MAX_JUMP_DPS = 360.0
     MAX_REJECTS = 5
 
     def __init__(self, name: str, side: str, min_visibility: float, filter_cfg: dict):
@@ -200,7 +200,9 @@ class JointComponentTwin:
                     s.opposite_raised = True
 
         previous = s.angle
-        s.angle = self._filter(raw - s.baseline, t)
+        self._med = (getattr(self, "_med", []) + [raw])[-5:]
+        raw_m = sorted(self._med)[len(self._med) // 2]
+        s.angle = self._filter(raw_m - s.baseline, t)
         s.velocity_dps = self._filter.derivative
 
         if not calibrating:

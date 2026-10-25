@@ -183,7 +183,7 @@ class ExerciseEvaluator:
         finished: Repetition | None = None
 
         if self.current is None:
-            if angle > self.cfg["rep_start_deg"]:
+            if angle > self.cfg["rep_start_deg"] and t - getattr(self, "_last_end", -9.0) >= 0.5:
                 self.current = Repetition(number=len(self.reps) + 1, started_at=t)
         if self.current is not None:
             rep = self.current
@@ -200,7 +200,13 @@ class ExerciseEvaluator:
             if angle > upper + self.tolerance:
                 self._say("over_range", "Lower slightly - you are beyond the target range.", "warning")
 
-            if angle < self.cfg["rest_max_deg"]:
+            if angle < self.cfg["rest_max_deg"]:
+                if getattr(self, "_below_since", None) is None:
+                    self._below_since = t
+            else:
+                self._below_since = None
+            if (angle < self.cfg["rest_max_deg"] and self._below_since is not None
+                    and t - self._below_since >= 0.25 and t - rep.started_at >= 0.8):
                 rep.ended_at = t
                 rep.arom = classify_arom(rep.peak_deg, self.rom_standard, self.tolerance)
                 if rep.tracking_lost or rep.peak_deg < self.cfg["incomplete_below_deg"]:
@@ -212,7 +218,9 @@ class ExerciseEvaluator:
                 else:
                     rep.result = "valid"
                     self._say("rep_valid", f"Good. {self.valid + 1} valid repetitions.", "success")
-                self.reps.append(rep)
+                self.reps.append(rep)
+                self._below_since = None
+                self._last_end = t
                 self.current = None
                 finished = rep
         return finished
