@@ -135,6 +135,44 @@
       },
       "training_endpoint_status": "User requested; not PT approved",
       "legacy_counter_note": "Existing scalar ankle counter retained. Directional endpoints do not create a bidirectional-cycle counter."
+    },
+    "prone_leg_flexion": {
+      "display_name": "Prone Leg Flexion",
+      "backend_names": [
+        "prone leg flexion",
+        "prone knee flexion",
+        "prone leg curl"
+      ],
+      "posture": "prone",
+      "camera_view": "Place the camera at the side of the mat, level with the knee.",
+      "primary_joint": "knee",
+      "hip_motion": "extension",
+      "rom_standard_deg": [
+        0,
+        135
+      ],
+      "rest_max_deg": 20,
+      "rep_start_deg": 30,
+      "incomplete_below_deg": 65,
+      "max_speed_dps": 180,
+      "required_joints": [
+        "hip",
+        "knee"
+      ],
+      "instructions": [
+        "Lie on your stomach with your legs straight.",
+        "Keep your thigh on the mat.",
+        "Bend the knee to bring the heel toward you, then lower it slowly."
+      ],
+      "deviations": [
+        {
+          "id": "thigh_lifted",
+          "joint": "hip",
+          "op": ">",
+          "value": 15,
+          "message": "Keep your thigh flat on the mat."
+        }
+      ]
     }
   }
 }
