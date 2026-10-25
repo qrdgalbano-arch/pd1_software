@@ -1,3 +1,0 @@
-Place the Sketchfab "Male Character PS1-Style" glTF download here:
-  avatar/scene.gltf, avatar/scene.bin, avatar/textures/...
-If no model is found, the station uses a built-in low-poly Component Twin avatar.

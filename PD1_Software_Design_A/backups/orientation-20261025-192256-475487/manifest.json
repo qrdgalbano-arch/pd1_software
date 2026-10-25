@@ -1,8 +1,0 @@
-{
-  "station/component_twin.py": true,
-  "station/engine.py": true,
-  "web/app.js": true,
-  "station/orientation.py": false,
-  "web/pose-orientation.js": false,
-  "web/avatar.js": true
-}
