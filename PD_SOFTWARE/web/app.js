@@ -337,7 +337,7 @@ async function loadPrescriptions() {
       `/api/patients/${encodeURIComponent(patientId)}/prescriptions`,
     );
     if (generation !== patientGeneration) return;
-    prescriptions = (data.prescriptions || []).filter(p => !["prone_leg_flexion", "prone_knee_flexion"].includes(p.exercise_key));
+    prescriptions = (data.prescriptions || []).filter(p => ["straight_leg_raising", "straight_leg_raise", "ankle_pump", "ankle_pumps", "prone_leg_flexion", "prone_knee_flexion"].includes(p.exercise_key));
     $("prescription").replaceChildren(
       ...(prescriptions.length
         ? prescriptions.map((p) =>
