@@ -812,6 +812,23 @@
 <style>
 .twin-selector { display:none !important; }
 </style>
+<!-- PD1_TWIN_ENLARGE_V1 -->
+<style id="pd1-twin-enlarge">
+  :root { --pd1-twin-model-height: clamp(420px, 58vh, 720px); }
+  @media (min-width: 1101px) {
+    .live-stage { grid-template-columns: 220px minmax(180px, 1fr) clamp(380px, 34vw, 560px); }
+    body.twin-large .live-stage { grid-template-columns: 200px minmax(160px, 1fr) minmax(520px, 52vw); }
+    body.twin-large { --pd1-twin-model-height: clamp(520px, 72vh, 900px); }
+  }
+  @media (min-width: 1600px) {
+    .live-stage { grid-template-columns: 260px minmax(300px, 1fr) clamp(460px, 32vw, 640px); }
+    body.twin-large .live-stage { grid-template-columns: 220px minmax(200px, 1fr) minmax(640px, 50vw); }
+  }
+  #camera-protocol { margin: var(--space-4) 0; padding: var(--space-3); border: 2px solid var(--color-border); border-radius: var(--radius-md); }
+  #camera-protocol summary { font-weight: 700; }
+  #camera-protocol ol { padding-left: var(--space-6); margin-top: var(--space-2); }
+  #camera-protocol li { margin-bottom: var(--space-2); font-size: var(--text-sm); }
+</style>
 </head>
 
 
@@ -5233,7 +5250,42 @@ document.addEventListener("click", e => {
   e.target.textContent = big ? "Enlarge" : "Shrink";
   window.dispatchEvent(new Event("resize"));
 });
-</script></body>
+</script><!-- PD1_TWIN_ENLARGE_V1_JS -->
+<script>
+(function () {
+  const heading = document.getElementById("twin-title");
+  if (heading) {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.id = "twin-enlarge"; btn.className = "btn compact";
+    btn.setAttribute("aria-pressed", "false"); btn.textContent = "Enlarge twin";
+    btn.style.margin = "0 auto 8px"; btn.style.display = "flex";
+    heading.insertAdjacentElement("afterend", btn);
+    const apply = (on) => {
+      document.body.classList.toggle("twin-large", on);
+      btn.setAttribute("aria-pressed", String(on));
+      btn.textContent = on ? "Shrink twin" : "Enlarge twin";
+      try { localStorage.setItem("pd1TwinLarge", on ? "1" : "0"); } catch (e) {}
+      window.dispatchEvent(new Event("resize"));
+    };
+    btn.addEventListener("click", () => apply(!document.body.classList.contains("twin-large")));
+    try { if (localStorage.getItem("pd1TwinLarge") === "1") apply(true); } catch (e) {}
+  }
+  const list = document.getElementById("instructions");
+  if (list && !document.getElementById("camera-protocol")) {
+    const box = document.createElement("details");
+    box.id = "camera-protocol"; box.open = true;
+    box.innerHTML = "<summary>Camera setup checklist</summary><ol>" +
+      "<li>Put the camera on a stable stand at mat height, 2 to 3 metres away, on the side of the exercising leg.</li>" +
+      "<li>Keep the whole body from hip to foot in view, with space around it.</li>" +
+      "<li>Use bright, even light from the front or above. Avoid a bright window behind you.</li>" +
+      "<li>Wear fitted, plain clothing and keep the foot visible. Use a plain background.</li>" +
+      "<li>Do not move the camera or the mat after calibration starts.</li>" +
+      "<li>Check the live preview shows hip, knee and ankle before pressing Start.</li></ol>";
+    list.insertAdjacentElement("afterend", box);
+  }
+})();
+</script>
+</body>
 
 
 
