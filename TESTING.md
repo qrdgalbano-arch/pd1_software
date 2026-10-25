@@ -11,7 +11,7 @@ The POC is a rehabilitation monitoring system. It intentionally excludes AI, cam
 Run from the repository root:
 
 ```powershell
-docker compose exec backend python -m pytest -q
+.\scripts\test.ps1
 ```
 
 Current result:
@@ -20,7 +20,7 @@ Current result:
 33 passed
 ```
 
-The backend suite uses FastAPI `TestClient` and a separate in-memory SQLite database. Tests override the application database dependency, create the SQLAlchemy model tables for each test, and do not read or write the Docker PostgreSQL demo database.
+The backend suite uses FastAPI `TestClient` and a separate in-memory SQLite database. Tests override the application database dependency, create the SQLAlchemy model tables for each test, and do not read or write the local PostgreSQL database.
 
 ### Coverage
 
@@ -61,8 +61,8 @@ Existing Flutter tests validate enriched prescription JSON parsing, duration for
 Run from the repository root:
 
 ```powershell
-docker compose up -d --build
-docker compose exec backend python -m compileall /app/app
+.\scripts\run.ps1
+.\backend\venv\Scripts\python.exe -m compileall .\backend\app
 node --check .\backend\app\web\static\js\staff_dashboard.js
 ```
 
@@ -86,3 +86,5 @@ Verify staff login, dashboard summary cards, session-status chart, patient searc
 - The current Flutter source tree does not contain an implemented ObjectBox queue or WorkManager synchronization module, so offline-queue behavior is not currently testable in this repository state.
 - The test database is SQLite for fast isolated API tests. PostgreSQL-specific behavior should be validated in a future integration-test environment before production deployment.
 - Automated browser end-to-end tests are not included; the staff dashboard has been validated through manual browser smoke testing.
+
+
