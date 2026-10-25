@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "minimum_display_seconds": 2.5,
+  "minimum_display_seconds": 3.0,
   "same_category_update_seconds": 4.0,
   "priorities": {
     "positioning": 100,
@@ -12,6 +12,7 @@
     "rep_incomplete": 55,
     "tracking_ok": 30,
     "rep_valid": 10,
-    "default": 20
+    "default": 20,
+    "continue": 5
   }
 }

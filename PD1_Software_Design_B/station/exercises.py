@@ -183,7 +183,7 @@ class ExerciseEvaluator:
         finished: Repetition | None = None
 
         if self.current is None:
-            if angle > self.cfg["rep_start_deg"] and t - getattr(self, "_last_end", -9.0) >= 0.5:
+            if self._rep_armed(angle, t):
                 self.current = Repetition(number=len(self.reps) + 1, started_at=t)
         if self.current is not None:
             rep = self.current
@@ -208,6 +208,11 @@ class ExerciseEvaluator:
             if (angle < self.cfg["rest_max_deg"] and self._below_since is not None
                     and t - self._below_since >= 0.25 and t - rep.started_at >= 0.8):
                 rep.ended_at = t
+                if rep.peak_deg - self.cfg["rep_start_deg"] < 3.0 and not rep.deviations and not rep.tracking_lost:
+                    self._below_since = None
+                    self._last_end = t
+                    self.current = None
+                    return None
                 rep.arom = classify_arom(rep.peak_deg, self.rom_standard, self.tolerance)
                 if rep.tracking_lost or rep.peak_deg < self.cfg["incomplete_below_deg"]:
                     rep.result = "incomplete"
@@ -250,3 +255,19 @@ class ExerciseEvaluator:
 # PD1_FEEDBACK_GATE_V1
 from station.feedback_gate import install as _install_feedback_gate
 _install_feedback_gate(ExerciseEvaluator)
+
+
+# PD1_REP_DEBOUNCE_V1
+def _rep_armed(self, angle, t):
+    if angle <= self.cfg["rep_start_deg"]:
+        self._above_since = None
+        return False
+    if getattr(self, "_above_since", None) is None:
+        self._above_since = t
+    if t - self._above_since >= 0.15 and t - getattr(self, "_last_end", -9.0) >= 0.5:
+        self._above_since = None
+        return True
+    return False
+
+
+ExerciseEvaluator._rep_armed = _rep_armed
