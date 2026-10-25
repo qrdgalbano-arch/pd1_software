@@ -355,8 +355,8 @@ export class TwinAvatar {
     const dt = this.lastTime == null ? 1 / 60 : Math.min(Math.max((time - this.lastTime) / 1000, 0), 0.1);
     this.lastTime = time;
     if (this.root && this.target && this.side) {
-      const alpha = 1 - Math.exp(-26 * dt);
-      for (const role of ROLES) if (Number.isFinite(this.target[role])) this.display[role] += (this.target[role] - this.display[role]) * alpha;
+      const alpha = 1 - Math.exp(-10 * dt);
+      for (const role of ROLES) if (Number.isFinite(this.target[role]) && Math.abs(this.target[role] - this.display[role]) > 0.75) this.display[role] += (this.target[role] - this.display[role]) * alpha;
       const b = this.bones[this.side], sign = (key) => this.sign[key] ?? 1, hip = this.display.hip * DEG;
       if (this.hipMotion === "abduction") this.rotate(b.hip, BODY_Z, (this.side === "left" ? 1 : -1) * hip * sign("hip_abduction"));
       else if (this.hipMotion === "extension") this.rotate(b.hip, BODY_X, hip * sign("hip_extension"));

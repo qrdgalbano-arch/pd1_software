@@ -334,7 +334,7 @@ export function attachOrientation(avatar) {
     const dt = Math.max(0, Math.min(.1, (now-state.last)/1000));
     state.last = now;
 
-    const alpha = reduced ? 1 : 1-Math.exp(-10*dt);
+    const alpha = reduced ? 1 : 1-Math.exp(-6*dt);
     const fresh = now-state.received < 650;
     let applied = false;
 

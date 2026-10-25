@@ -196,7 +196,7 @@
 
 
 
-    --pd1-twin-model-height: clamp(280px, 36vh, 420px);
+    --pd1-twin-model-height: clamp(420px, 60vh, 720px);
 
 
 
@@ -430,7 +430,7 @@
 
 
 
-    min-height: 280px !important;
+    min-height: 420px !important;
 
 
 
@@ -754,7 +754,7 @@
 
 
 
-      --pd1-twin-model-height: 320px;
+      --pd1-twin-model-height: 420px;
 
 
 
@@ -2632,7 +2632,7 @@
 
 
 
-            <h2 id="twin-title">DIGITAL TWIN</h2>
+            <h2 id="twin-title">DIGITAL TWIN</h2><button id="twin-enlarge" type="button" class="btn compact">Enlarge</button>
 
 
 
@@ -4711,7 +4711,7 @@
 
 
 
-    <script type="module" src="/static/app.js?v=no-side-lifts-1"></script>
+    <script type="module" src="/static/app.js?v=ux-fix-1"></script>
 
 
 
@@ -5220,7 +5220,20 @@
 
 
 
-</body>
+<style id="pd1-ux-fix">
+.pd1-depth-note, .live-footnote #camera-view { display: none !important; }
+#prompt { font-size: clamp(1.4rem, 2.4vw, 2rem) !important; font-weight: 700 !important; }
+</style>
+<script>
+document.addEventListener("click", e => {
+  if (e.target.id !== "twin-enlarge") return;
+  const r = document.documentElement, big = r.dataset.twinBig === "1";
+  r.dataset.twinBig = big ? "0" : "1";
+  r.style.setProperty("--pd1-twin-model-height", big ? "clamp(420px, 60vh, 720px)" : "88vh");
+  e.target.textContent = big ? "Enlarge" : "Shrink";
+  window.dispatchEvent(new Event("resize"));
+});
+</script></body>
 
 
 
