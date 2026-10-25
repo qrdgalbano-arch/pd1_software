@@ -6,8 +6,8 @@
   "max_baseline_offset_deg": 15,
   "rom_tolerance_deg": 10,
   "filter": {
-    "min_cutoff": 0.8,
-    "beta": 0.01,
+    "min_cutoff": 0.5,
+    "beta": 0.02,
     "d_cutoff": 1.0
   },
   "exercises": {

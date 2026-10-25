@@ -3264,7 +3264,7 @@ function render(state) {
 
 
 
-        speak(ev.prompt.text);
+        if (ev.prompt.level !== "success" && performance.now() - (window.__lastCoachSpeak || 0) > 3500) { window.__lastCoachSpeak = performance.now(); speak(ev.prompt.text); }
 
 
 
