@@ -1665,7 +1665,7 @@ async function loadPrescriptions() {
 
 
 
-    prescriptions = data.prescriptions || [];
+    prescriptions = (data.prescriptions || []).filter(p => /straight|ankle|prone/i.test(p.exercise_key + " " + (p.exercise?.name || "")) && !/side/i.test(p.exercise_key + " " + (p.exercise?.name || "")));
 
 
 
