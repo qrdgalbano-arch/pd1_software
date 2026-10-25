@@ -15,15 +15,23 @@ from station.pose import LANDMARKS, Point
 
 
 def angle_at(a: Point, b: Point, c: Point) -> float:
-    """Interior angle ABC in degrees (2D image plane)."""
-    v1 = (a.x - b.x, a.y - b.y)
-    v2 = (c.x - b.x, c.y - b.y)
-    n1 = math.hypot(*v1)
-    n2 = math.hypot(*v2)
+    """Interior angle ABC; coordinates must share one unit system."""
+    v1 = (a.x - b.x, a.y - b.y, a.z - b.z)
+    v2 = (c.x - b.x, c.y - b.y, c.z - b.z)
+
+    if not all(math.isfinite(v) for v in (*v1, *v2)):
+        return float("nan")
+
+    n1 = math.sqrt(sum(v * v for v in v1))
+    n2 = math.sqrt(sum(v * v for v in v2))
+
     if n1 < 1e-6 or n2 < 1e-6:
         return float("nan")
-    cos = (v1[0] * v2[0] + v1[1] * v2[1]) / (n1 * n2)
-    return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
+
+    cosine = sum(x * y for x, y in zip(v1, v2)) / (n1 * n2)
+    cosine = max(-1.0, min(1.0, cosine))
+
+    return math.degrees(math.acos(cosine))
 
 
 # Joint definitions: (landmark names forming the angle, conversion to clinical angle)
@@ -87,7 +95,7 @@ class JointComponentTwin:
         self._indices = [str(LANDMARKS[side][n]) for n in names]
         self._filter = OneEuroFilter(**filter_cfg)
         self._pt_filters = [
-            (OneEuroFilter(**self.POINT_FILTER), OneEuroFilter(**self.POINT_FILTER))
+            tuple(OneEuroFilter(**self.POINT_FILTER) for _ in range(3))
             for _ in self._indices
             ]
         self._rejects = 0
@@ -99,9 +107,10 @@ class JointComponentTwin:
     # --- patient-specific calibration -------------------------------------
     def reset_tracking(self) -> None:
         self._filter.reset()
-        for fx, fy in self._pt_filters:
-            fx.reset()
-            fy.reset()
+        for filters in self._pt_filters:
+            for point_filter in filters:
+                point_filter.reset()
+        self.state.raw_angle = None
         self._rejects = 0
     
     def start_calibration(self) -> None:
@@ -128,14 +137,27 @@ class JointComponentTwin:
         points = None
         if landmarks is not None:
             points = [landmarks.get(i) for i in self._indices]
-            if any(p is None or p.visibility < self.min_visibility for p in points):
+            if any(
+                p is None
+                or not all(
+                    math.isfinite(v)
+                    for v in (p.x, p.y, p.z, p.visibility)
+                )
+                or p.visibility < self.min_visibility
+                for p in points
+            ):
                 points = None
 
         raw = float("nan")
         if points is not None:
             points = [
-                Point(fx(p.x, t), fy(p.y, t), p.visibility)
-                for p, (fx, fy) in zip(points, self._pt_filters)
+                Point(
+                    x=fx(p.x, t),
+                    y=fy(p.y, t),
+                    z=fz(p.z, t),
+                    visibility=p.visibility,
+                )
+                for p, (fx, fy, fz) in zip(points, self._pt_filters)
             ]
             raw = self._convert(angle_at(*points))
 
@@ -211,29 +233,17 @@ class ComponentTwinModel:
             for name in ("hip", "knee", "ankle")
         }
 
-    def _resolve_active_side(self, landmarks: dict[str, Point] | None) -> str:
-        """Resolve MediaPipe label swapping by picking the limb with active exercise elevation."""
-        if not landmarks:
-            return self.side
-
-        # Check ankle Y-positions (lower pixel Y = higher physical elevation in camera frame)
-        ankle_l = landmarks.get(str(LANDMARKS["left"]["ankle"]))
-        ankle_r = landmarks.get(str(LANDMARKS["right"]["ankle"]))
-
-        if ankle_l and ankle_r and ankle_l.visibility >= self.min_visibility and ankle_r.visibility >= self.min_visibility:
-            # If one leg is elevated significantly higher (> 40px higher), lock whole leg to that landmark set
-            if ankle_l.y < ankle_r.y - 40:
-                return "left"
-            elif ankle_r.y < ankle_l.y - 40:
-                return "right"
-
-        return self.active_side
+    def _resolve_active_side(self, landmarks):
+        """Camera proximity never changes the prescribed anatomical side."""
+        return self.side
 
     def update(self, landmarks: dict[str, Point] | None, t: float, calibrating: bool = False) -> dict[str, JointState]:
         if not calibrating:
             self.active_side = self._resolve_active_side(landmarks)
 
-        # Update joint indices to follow the resolved whole-limb side
+        self.active_side = self.side
+
+        # Update joint indices to follow the prescribed anatomical side
         for twin in self.joints.values():
             names, _ = JOINT_DEFINITIONS[twin.name]
             twin._indices = [str(LANDMARKS[self.active_side][n]) for n in names]
@@ -255,3 +265,7 @@ class ComponentTwinModel:
     def reset_tracking(self) -> None:
         for twin in self.joints.values():
             twin.reset_tracking()
+
+# POSE3D_BACKEND_PATCH_V1
+
+# POSE_ORIENTATION_PATCH_V1

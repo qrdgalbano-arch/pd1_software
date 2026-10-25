@@ -1452,3 +1452,46 @@ summary {
     top: 150px;
   }
 }
+
+/* Single-design viewer: preserve v5 typography, themes and camera-first layout. */
+.twin-panel.twin-single { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; overflow: visible; }
+.twin-single[data-design="component"] { --twin-accent: var(--color-component); }
+.twin-single[data-design="asset"] { --twin-accent: var(--color-asset); }
+.twin-single[data-design="system"] { --twin-accent: var(--color-system); }
+.twin-single [hidden] { display: none !important; }
+.twin-selector { display: grid; gap: var(--space-1); padding: 0 var(--space-2); }
+.twin-selector label { font-size: var(--text-xs); font-weight: 700; }
+.twin-selector select { width: 100%; min-width: 0; min-height: 48px; padding: var(--space-2); font-size: var(--text-xs); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); }
+.twin-view { display: flex; flex: 1; flex-direction: column; min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+.twin-view > h3 { font-size: var(--text-xs); padding: var(--space-2) var(--space-3); color: white; background: var(--twin-accent); }
+.twin-view .joint-tabs { padding-bottom: 0; }
+.twin-view .joint-tabs button { min-height: 44px; font-size: var(--text-xs); }
+.twin-view .joint-tabs button[aria-pressed="true"] { background: var(--twin-accent); border-color: var(--twin-accent); }
+.twin-text-button { display: block; width: calc(100% - var(--space-4)); margin: var(--space-1) var(--space-2); min-height: 44px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); font-size: var(--text-xs); text-align: left; }
+.twin-text-button[aria-pressed="true"] { font-weight: 700; }
+.twin-model-surface { position: relative; flex: 1; display: flex; min-height: 240px; background: var(--color-surface-2); }
+.twin-single #avatar { height: auto; min-height: 240px; flex: 1; width: 100%; background: var(--color-surface-2); }
+.twin-single #avatar canvas { width: 100% !important; height: 100% !important; position: absolute; inset: 0; touch-action: none; }
+.twin-model-message { position: relative; z-index: 1; width: 100%; min-height: 240px; padding: var(--space-4); display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-3); background: var(--color-surface-2); font-size: var(--text-xs); }
+.twin-model-surface:has(.twin-model-message:not([hidden])) #avatar { position: absolute; inset: 0; }
+.twin-model-message b { font-size: var(--text-sm); }
+.twin-model-message p { overflow-wrap: anywhere; }
+.twin-camera-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1); padding: var(--space-1) var(--space-2); background: var(--color-surface); }
+.twin-camera-controls label { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; font-size: var(--text-xs); }
+.twin-camera-controls input { width: 20px; height: 20px; accent-color: var(--twin-accent); }
+.twin-camera-controls button { min-height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); background: var(--color-surface-2); font-size: var(--text-xs); }
+.twin-single .component-reading { padding-top: var(--space-2); }
+.twin-single #component-rom, .twin-single #system-readings > .hint { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+.twin-model-status, .twin-attribution { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); }
+.twin-attribution { border-top: 1px solid var(--color-border); }
+.twin-attribution a { color: var(--color-link); text-decoration: underline; }
+.twin-single button:hover { filter: brightness(0.95); }
+.twin-single button:active { transform: translateY(1px); }
+@media (min-width: 801px) { .live-stage { grid-template-columns: 200px minmax(180px, 1fr) 360px; } }
+@media (min-width: 1600px) { .live-stage { grid-template-columns: 260px minmax(300px, 1fr) 400px; } }
+@media (max-width: 1100px) and (min-width: 801px) { .live-stage { grid-template-columns: 150px minmax(100px, 1fr) 320px; } }
+@media (max-width: 800px) {
+  .twin-panel.twin-single { display: flex; grid-template-columns: none; }
+  .twin-single #avatar, .twin-model-surface { min-height: 320px; }
+}
+@media (prefers-reduced-motion: reduce) { .twin-single button:active { transform: none; } }

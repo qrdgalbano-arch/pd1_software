@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f6f5" />
     <title>PD1 · Digital Twin Exercise Station</title>
-    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/style.css?v=single-twin-1" />
     <script type="importmap">
       {
         "imports": {
@@ -211,48 +211,51 @@
             <span id="prompt-symbol" aria-hidden="true">●</span
             ><span id="prompt-text">Hold still in the starting position.</span>
           </div>
-          <aside class="twin-panel" aria-labelledby="twin-title">
+          <aside class="twin-panel twin-single" data-design="component" aria-labelledby="twin-title">
             <h2 id="twin-title">DIGITAL TWIN</h2>
-            <section class="twin-section component">
-              <h3>COMPONENT <span>Selected joint</span></h3>
-              <div class="joint-tabs" role="group" aria-label="Inspect a joint">
-                <button type="button" data-joint="hip" aria-pressed="false">
-                  Hip</button
-                ><button type="button" data-joint="knee" aria-pressed="true">
-                  Knee</button
-                ><button type="button" data-joint="ankle" aria-pressed="false">
-                  Ankle
-                </button>
+            <div class="twin-selector">
+              <label for="twin-design">View design</label>
+              <select id="twin-design" aria-controls="twin-viewport">
+                <option value="component">A · Component — joint</option>
+                <option value="asset">B · Asset — leg (later)</option>
+                <option value="system">C · System — whole body</option>
+              </select>
+            </div>
+            <section id="twin-viewport" class="twin-view" aria-labelledby="twin-view-title">
+              <h3 id="twin-view-title">A · Component-level</h3>
+              <div id="component-controls">
+                <div class="joint-tabs" role="group" aria-label="Inspect one joint">
+                  <button type="button" data-joint="hip" aria-pressed="false">Hip</button>
+                  <button type="button" data-joint="knee" aria-pressed="true">Knee</button>
+                  <button type="button" data-joint="ankle" aria-pressed="false">Ankle</button>
+                </div>
+                <button id="twin-auto-joint" type="button" class="twin-text-button" aria-pressed="true">Exercise joint: automatic</button>
               </div>
-              <div class="component-reading">
-                <b id="component-angle">—</b
-                ><span id="component-state">Waiting for tracking</span>
+              <div class="twin-model-surface">
+                <div id="avatar" role="img" aria-label="Design A skeleton: selected joint close-up" aria-busy="true"></div>
+                <div id="twin-model-message" class="twin-model-message" role="status" aria-live="polite" aria-atomic="true">
+                  <b id="twin-message-title">Loading Design A</b>
+                  <p id="twin-message-body">Loading your skeleton model.</p>
+                  <button id="twin-retry" type="button" class="btn compact" hidden>Retry model</button>
+                </div>
               </div>
-              <p id="component-rom" class="hint">Measured ROM: —</p>
-            </section>
-            <section class="twin-section asset">
-              <h3>ASSET <span>Leg digital twin</span></h3>
-              <div
-                id="avatar"
-                role="img"
-                aria-label="Articulated digital twin of the affected leg"
-              ></div>
-              <p id="avatar-error" class="hint" hidden>
-                3D view unavailable. Joint measurements remain available.
-              </p>
-              <p id="asset-tracking" class="asset-caption">
-                Hip · Knee · Ankle
-              </p>
-            </section>
-            <section class="twin-section system">
-              <h3>SYSTEM <span>Exercise tracking</span></h3>
-              <div id="joint-chain" class="joint-chain"></div>
-              <p id="system-status" class="system-status">
-                Waiting for tracking
-              </p>
-              <p class="hint">
-                Trunk compensation is not measured by this station.
-              </p>
+              <div class="twin-camera-controls">
+                <label><input id="twin-follow" type="checkbox" checked /> Follow movement</label>
+                <button id="twin-recenter" type="button">Recenter</button>
+              </div>
+              <div id="component-readings">
+                <div class="component-reading"><b id="component-angle">—</b><span id="component-state">Waiting for tracking</span></div>
+                <p id="component-rom" class="hint">Measured ROM: —</p>
+              </div>
+              <div id="asset-readings" hidden><p id="asset-tracking" class="asset-caption">Hip · Knee · Ankle</p></div>
+              <div id="system-readings" hidden>
+                <div id="joint-chain" class="joint-chain"></div>
+                <p id="system-status" class="system-status">Waiting for tracking</p>
+                <p class="hint">Whole-body model view only. v5 does not measure trunk compensation or bilateral coordination.</p>
+              </div>
+              <p id="twin-model-status" class="twin-model-status" role="status" aria-live="polite">Preparing Design A.</p>
+              <p id="avatar-error" class="hint" hidden>3D view unavailable. Joint measurements remain available.</p>
+              <p id="twin-attribution" class="twin-attribution" hidden></p>
             </section>
           </aside>
           <div class="live-controls">
@@ -439,6 +442,6 @@
       <span>QMMC · PD1 rehabilitation proof of concept</span
       ><span>Follow your rehabilitation team’s advice.</span>
     </footer>
-    <script type="module" src="/static/app.js"></script>
+    <script type="module" src="/static/app.js?v=single-twin-1"></script>
   </body>
 </html>

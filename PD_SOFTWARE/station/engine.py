@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 import cv2
 
+from station.orientation import OrientationTracker
 from station.component_twin import ComponentTwinModel
 from station.config import StationSettings, load_exercise_config
 from station.exercises import ExerciseEvaluator, classify_arom
@@ -45,6 +46,10 @@ class ExerciseEngine(threading.Thread):
         self.side = "left"
         self.exercise_key = "straight_leg_raising"
         self.twin = self._new_twin(self.side)
+        self.orientation_tracker = OrientationTracker(
+            self.cfg["min_landmark_visibility"]
+        )
+        self.orientation_state = None
 
         self.session: dict | None = None
         self.evaluator: ExerciseEvaluator | None = None
@@ -278,6 +283,10 @@ class ExerciseEngine(threading.Thread):
 
         metrics = {
             "end_reason": reason,
+            "measurement_space": "world_3d_inferred",
+            "angle_method": "three_point_xyz_proxy",
+            "clinical_3d_validated": False,
+            "depth_sensor": False,
             "avg_fps": round(
                 sum(fps_samples) / len(fps_samples),
                 1,
@@ -479,8 +488,23 @@ class ExerciseEngine(threading.Thread):
             and session["phase"] == "calibrating"
         )
 
+        world_landmarks = getattr(
+            landmarks, "world_landmarks", None
+        )
+
+        session_id = (
+            session.get("client_session_id") if session else None
+        )
+        if session_id != self.orientation_tracker.previous_session:
+            self.orientation_tracker.reset()
+            self.orientation_tracker.previous_session = session_id
+
+        self.orientation_state = self.orientation_tracker.update(
+            world_landmarks, t
+        )
+
         joints = self.twin.update(
-            landmarks,
+            world_landmarks,
             t,
             calibrating=calibrating,
         )
@@ -654,6 +678,12 @@ class ExerciseEngine(threading.Thread):
                 "phase": phase,
                 "camera_error": self.camera_error,
                 "pose_detected": landmarks is not None,
+                "orientation3d": (
+                    self.orientation_state
+                    if landmarks is not None else None
+                ),
+                "measurement_space": "world_3d_inferred",
+                "clinical_3d_validated": False,
                 "fps": round(self.fps, 1),
                 "pose_ms": round(self.pose_ms, 1),
                 "frames": self.frames,
@@ -706,3 +736,7 @@ class ExerciseEngine(threading.Thread):
     def snapshot(self) -> dict:
         with self._lock:
             return self.state
+
+# POSE3D_BACKEND_PATCH_V1
+
+# POSE_ORIENTATION_PATCH_V1

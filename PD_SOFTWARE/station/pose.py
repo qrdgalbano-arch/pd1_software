@@ -22,6 +22,14 @@ class Point:
     visibility: float = 0.0
 
 
+class PoseFrame(dict):
+    """Image points plus separate inferred 3D world points."""
+
+    def __init__(self, image_landmarks, world_landmarks):
+        super().__init__(image_landmarks)
+        self.world_landmarks = world_landmarks
+
+
 class PoseEstimator:
     def __init__(self, model_path: str):
         options = vision.PoseLandmarkerOptions(
@@ -40,7 +48,7 @@ class PoseEstimator:
         self._last_ts = -1
 
     def detect(self, frame_bgr: np.ndarray, timestamp_ms: int) -> dict[str, Point] | None:
-        """Return the 33 landmarks as pixel Points keyed by index (str), or None."""
+        """Return image points and separate inferred world points, or None."""
         timestamp_ms = max(timestamp_ms, self._last_ts + 1)
         self._last_ts = timestamp_ms
 
@@ -52,10 +60,33 @@ class PoseEstimator:
             return None
 
         height, width = frame_bgr.shape[:2]
-        return {
-            str(index): Point(lm.x * width, lm.y * height, float(lm.z or 0.0), float(lm.visibility or 0.0))
-            for index, lm in enumerate(result.pose_landmarks[0])
+
+        image_points = {
+            str(i): Point(
+                x=float(lm.x) * width,
+                y=float(lm.y) * height,
+                z=float(lm.z or 0.0),
+                visibility=float(lm.visibility or 0.0),
+            )
+            for i, lm in enumerate(result.pose_landmarks[0])
         }
+
+        world_points = {}
+
+        if result.pose_world_landmarks:
+            world_points = {
+                str(i): Point(
+                    x=float(lm.x),
+                    y=float(lm.y),
+                    z=float(lm.z),
+                    visibility=float(lm.visibility or 0.0),
+                )
+                for i, lm in enumerate(result.pose_world_landmarks[0])
+            }
+
+        return PoseFrame(image_points, world_points)
 
     def close(self) -> None:
         self._landmarker.close()
+
+# POSE3D_BACKEND_PATCH_V1

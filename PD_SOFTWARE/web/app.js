@@ -12,6 +12,9 @@ let lastSummary = null;
 let screen = "start";
 let historyOrigin = "start";
 let selectedJoint = "knee";
+let selectedDesign = "component";
+let autoJoint = true;
+let twinSwitchGeneration = 0;
 let activeSessionId = null;
 let lastPromptKey = "";
 let socket = null;
@@ -138,29 +141,130 @@ function attachCamera() {
   if (!$("camera").getAttribute("src"))
     $("camera").src = `/video.mjpg?view=${Date.now()}`;
 }
-async function initAvatar() {
-  if (avatar || avatarLoading) {
-    avatar?.resize();
-    return;
+const twinLabels = {
+  component: { title: "A · Component-level", model: "Design A skeleton", description: "Selected joint close-up" },
+  asset: { title: "B · Asset-level", model: "Design B leg", description: "Affected leg only" },
+  system: { title: "C · System-level", model: "Design C whole body", description: "Whole-body model view" },
+};
+function syncTwinUI() {
+  const label = twinLabels[selectedDesign];
+  document.querySelector(".twin-single").dataset.design = selectedDesign;
+  $("twin-design").value = selectedDesign;
+  $("twin-view-title").textContent = label.title;
+  $("component-controls").hidden = selectedDesign !== "component";
+  $("component-readings").hidden = selectedDesign !== "component";
+  $("asset-readings").hidden = selectedDesign !== "asset";
+  $("system-readings").hidden = selectedDesign !== "system";
+  $("avatar").setAttribute("aria-label", `${label.model}: ${label.description}`);
+  $("twin-auto-joint").setAttribute("aria-pressed", String(autoJoint));
+  $("twin-auto-joint").textContent = autoJoint ? "Exercise joint: automatic" : "Exercise joint: manual";
+  for (const button of document.querySelectorAll("[data-joint]"))
+    button.setAttribute("aria-pressed", String(button.dataset.joint === selectedJoint));
+  avatar?.setFocusJoint(selectedJoint);
+}
+function loadingTwin() {
+  const label = twinLabels[selectedDesign];
+  $("avatar").setAttribute("aria-busy", "true");
+  $("twin-model-message").hidden = false;
+  $("twin-message-title").textContent = `Loading ${label.model}`;
+  $("twin-message-body").textContent = "Only this design's own model will be shown.";
+  $("twin-model-status").textContent = `Loading ${label.title}.`;
+  $("twin-retry").hidden = true;
+  $("avatar-error").hidden = true;
+  $("twin-attribution").hidden = true;
+}
+function showTwinResult(info) {
+  if (info.stale) return;
+  const label = twinLabels[selectedDesign];
+  $("avatar").setAttribute("aria-busy", "false");
+  $("twin-model-message").hidden = Boolean(info.ready);
+  $("avatar-error").hidden = true;
+  $("twin-retry").hidden = false;
+  if (info.ready) {
+    $("tris").textContent = `${label.model}: ${info.triangles.toLocaleString()} triangles`;
+    $("twin-model-status").textContent = selectedDesign === "component"
+      ? `${label.model} · joint close-up · last pose held if tracking is lost`
+      : `${label.model} · selected leg angles only`;
+  } else {
+    $("tris").textContent = `${label.model}: not active`;
+    $("twin-message-title").textContent = `${label.model} not ready`;
+    $("twin-message-body").textContent = info.reason || "Model unavailable. No substitute model is displayed.";
+    $("twin-model-status").textContent = "Exercise tracking continues. This 3D model is not active.";
   }
+  const credit = avatar?.spec?.attribution;
+  $("twin-attribution").replaceChildren();
+  $("twin-attribution").hidden = !info.ready || !credit;
+  if (info.ready && credit) {
+    $("twin-attribution").append(document.createTextNode(`${credit.title} by ${credit.author}. `));
+    for (const [text, url] of [["Model", credit.source], [credit.license || "License", credit.license_url]]) {
+      if (!/^https?:\/\//i.test(url || "")) continue;
+      const a = document.createElement("a");
+      a.textContent = text;
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      $("twin-attribution").append(a, document.createTextNode(" "));
+    }
+    if (selectedDesign === "component") $("twin-attribution").append("Display modified: animated joint crop.");
+  }
+}
+function sendTwinFrame() {
+  if (!avatar) return;
+  if (calibrate) {
+    avatar.update(
+      { hip: Number($("cal-hip").value), knee: Number($("cal-knee").value), ankle: Number($("cal-ankle").value) },
+      { hip: "ok", knee: "ok", ankle: "ok" },
+      latest?.exercise || { posture: "supine", hip_motion: "flexion" },
+      side(),
+    );
+  } else if (latest?.joints && latest?.exercise) {
+    avatar.update(Object.fromEntries(Object.entries(latest.joints).map(([name, j]) => [name, j.tracked ? j.angle : null])),
+      jointStatus(latest), latest.exercise, latest.side);
+  }
+}
+async function initAvatar() {
+  if (avatar || avatarLoading) { avatar?.resize(); return; }
   avatarLoading = true;
+  loadingTwin();
   try {
-    const { TwinAvatar } = await import("/static/avatar.js");
+    const { TwinAvatar } = await import("/static/avatar.js?v=single-twin-1");
     avatar = new TwinAvatar($("avatar"));
     const info = await avatar.load();
-    $("tris").textContent =
-      `Avatar: ${info.source}, ${info.triangles.toLocaleString()} triangles`;
-    $("avatar-error").hidden = true;
+    if (!calibrate) {
+      const { attachOrientation } = await import(
+        "/static/pose-orientation.js?v=layout-1"
+      );
+      attachOrientation(avatar);
+    }
+    selectedDesign = avatar.design;
+    syncTwinUI();
+    showTwinResult(info);
     avatar.resize();
     avatar.setTheme(dark);
+    avatar.setFollow($("twin-follow").checked);
+    sendTwinFrame();
   } catch (error) {
-    $("avatar-error").hidden = false;
-    $("tris").textContent =
-      "Avatar unavailable; numeric joint readings remain active";
+    avatar?.dispose();
+    avatar = null;
+    showTwinResult({ ready: false, reason: error.message });
     console.warn("PD1 avatar:", error);
   } finally {
     avatarLoading = false;
   }
+}
+async function switchTwinDesign(design) {
+  if (!twinLabels[design]) return;
+  if (avatarLoading && !avatar?.map) { $("twin-design").value = selectedDesign; return; }
+  const generation = ++twinSwitchGeneration;
+  selectedDesign = design;
+  syncTwinUI();
+  loadingTwin();
+  if (!avatar) { await initAvatar(); return; }
+  const info = await avatar.setDesign(design);
+  if (generation !== twinSwitchGeneration || info.stale) return;
+  showTwinResult(info);
+  avatar.resize();
+  sendTwinFrame();
 }
 function updateControls() {
   const running = Boolean(latest?.session);
@@ -367,6 +471,11 @@ function jointStatus(state) {
 }
 function renderJoints(state, statuses) {
   const joints = state.joints || {};
+  const primary = state.exercise?.primary_joint;
+  if (autoJoint && ["hip", "knee", "ankle"].includes(primary) && selectedJoint !== primary) {
+    selectedJoint = primary;
+    syncTwinUI();
+  }
   const joint = joints[selectedJoint];
   $("component-angle").textContent = joint?.tracked
     ? degrees(joint.angle)
@@ -442,6 +551,9 @@ function renderJoints(state, statuses) {
 function render(state) {
   if (!state?.exercise || !state.joints) return;
   latest = state;
+  avatar?.updateOrientation?.(
+    state.orientation3d, state.side, state.phase, selectedJoint
+  );
   if (state.last_summary) lastSummary = state.last_summary;
   const session = state.session;
   const ev = state.evaluation;
@@ -784,6 +896,8 @@ $("reload-patients").addEventListener("click", () => {
 for (const button of document.querySelectorAll("[data-joint]"))
   button.addEventListener("click", () => {
     selectedJoint = button.dataset.joint;
+    autoJoint = false;
+    syncTwinUI();
     for (const tab of document.querySelectorAll("[data-joint]"))
       tab.setAttribute("aria-pressed", String(tab === button));
     if (latest?.joints) renderJoints(latest, jointStatus(latest));
@@ -802,28 +916,22 @@ $("theme-toggle").addEventListener("click", () => {
   dark = !dark;
   setTheme();
 });
+$("twin-design").addEventListener("change", (event) => switchTwinDesign(event.target.value));
+$("twin-auto-joint").addEventListener("click", () => {
+  autoJoint = !autoJoint;
+  if (autoJoint && ["hip", "knee", "ankle"].includes(latest?.exercise?.primary_joint)) selectedJoint = latest.exercise.primary_joint;
+  syncTwinUI();
+  if (latest?.joints) renderJoints(latest, jointStatus(latest));
+});
+$("twin-follow").addEventListener("change", (event) => avatar?.setFollow(event.target.checked));
+$("twin-recenter").addEventListener("click", () => avatar?.recenter());
+$("twin-retry").addEventListener("click", () => switchTwinDesign(selectedDesign));
 if (calibrate) {
   $("calibration").hidden = false;
-  const updateCalibration = () => {
-    if (!avatar) return;
-    const exercise = latest?.exercise || {
-      posture: "supine",
-      hip_motion: "flexion",
-    };
-    avatar.update(
-      {
-        hip: Number($("cal-hip").value),
-        knee: Number($("cal-knee").value),
-        ankle: Number($("cal-ankle").value),
-      },
-      { hip: "ok", knee: "ok", ankle: "ok" },
-      exercise,
-      side(),
-    );
-  };
   for (const id of ["cal-hip", "cal-knee", "cal-ankle"])
-    $(id).addEventListener("input", updateCalibration);
+    $(id).addEventListener("input", sendTwinFrame);
 }
+syncTwinUI();
 setTheme();
 voiceChanged();
 switchScreen(calibrate ? "live" : location.hash.slice(1) || "start", false);
@@ -838,3 +946,5 @@ window.addEventListener("pagehide", () => {
   clearInterval(pollTimer);
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 });
+
+// POSE_ORIENTATION_PATCH_V1
