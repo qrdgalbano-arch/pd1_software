@@ -1,0 +1,161 @@
+{
+  "type": "object",
+  "properties": {
+    "config_version": {
+      "type": "string"
+    },
+    "extension_enabled": {
+      "type": "boolean"
+    },
+    "design_scope": {
+      "type": "string",
+      "enum": [
+        "component",
+        "leg",
+        "whole_body"
+      ]
+    },
+    "scope_mapping": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "leg": {
+          "type": "string"
+        },
+        "whole_body": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "component",
+        "leg",
+        "whole_body"
+      ],
+      "additionalProperties": false
+    },
+    "component_visible_joints": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "hip",
+          "knee",
+          "ankle"
+        ]
+      }
+    },
+    "unapproved_mode": {
+      "type": "string",
+      "enum": [
+        "blocked",
+        "demo"
+      ]
+    },
+    "tracking": {
+      "type": "object",
+      "properties": {
+        "measurement_space": {
+          "type": "string"
+        },
+        "minimum_landmark_visibility": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "PT_SET: null until supplied and approved by the PT."
+        },
+        "filter": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string"
+            },
+            "min_cutoff": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "PT_SET: null until supplied and approved by the PT."
+            },
+            "beta": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "PT_SET: null until supplied and approved by the PT."
+            },
+            "derivative_cutoff": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "PT_SET: null until supplied and approved by the PT."
+            }
+          },
+          "required": [
+            "method",
+            "min_cutoff",
+            "beta",
+            "derivative_cutoff"
+          ],
+          "additionalProperties": false
+        },
+        "maximum_monitoring_gap_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "description": "PT_SET: maximum interval credited to monitoring."
+        }
+      },
+      "required": [
+        "measurement_space",
+        "minimum_landmark_visibility",
+        "filter"
+      ],
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "object",
+      "properties": {
+        "trend_session_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "match_patient_exercise_side_and_measurement_method": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "trend_session_count",
+        "match_patient_exercise_side_and_measurement_method"
+      ],
+      "additionalProperties": false
+    },
+    "disclaimer": {
+      "type": "string"
+    },
+    "redness_description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "config_version",
+    "extension_enabled",
+    "design_scope",
+    "scope_mapping",
+    "component_visible_joints",
+    "unapproved_mode",
+    "tracking",
+    "history",
+    "disclaimer",
+    "redness_description"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

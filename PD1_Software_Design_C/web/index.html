@@ -1,0 +1,5240 @@
+<!doctype html>
+
+
+
+
+
+
+
+
+<html lang="en" data-theme="light">
+
+
+
+
+
+
+
+
+  <head>
+
+
+
+
+
+
+
+
+    <meta charset="utf-8" />
+
+
+
+
+
+
+
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+
+
+
+
+
+    <meta name="theme-color" content="#f4f6f5" />
+
+
+
+
+
+
+
+
+    <title>PD1 · Digital Twin Exercise Station</title>
+
+
+
+
+
+
+
+
+    <link rel="stylesheet" href="/static/style.css?v=single-twin-1" />
+
+
+
+
+
+
+
+
+    <script type="importmap">
+
+
+
+
+
+
+
+
+      {
+
+
+
+
+
+
+
+
+        "imports": {
+
+
+
+
+
+
+
+
+          "three": "/static/vendor/three/build/three.module.js",
+
+
+
+
+
+
+
+
+          "three/addons/": "/static/vendor/three/examples/jsm/"
+
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+
+
+      }
+
+
+
+
+
+
+
+
+    </script>
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+<!-- PD1 TWIN PANEL EXTENSION START -->
+
+
+
+
+
+
+
+
+<style id="pd1-twin-panel-extension">
+
+
+
+
+
+
+
+
+  /* Presentation settings only; no clinical thresholds. */
+
+
+
+
+
+
+
+
+  :root {
+
+
+
+
+
+
+
+
+    --pd1-twin-panel-opacity: 92%;
+
+
+
+
+
+
+
+
+    --pd1-twin-model-height: clamp(280px, 36vh, 420px);
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .twin-panel.twin-single {
+
+
+
+
+
+
+
+
+    background: var(--color-surface);
+
+
+
+
+
+
+
+
+    background: color-mix(
+
+
+
+
+
+
+
+
+      in srgb,
+
+
+
+
+
+
+
+
+      var(--color-surface) var(--pd1-twin-panel-opacity),
+
+
+
+
+
+
+
+
+      transparent
+
+
+
+
+
+
+
+
+    );
+
+
+
+
+
+
+
+
+    min-width: 0;
+
+
+
+
+
+
+
+
+    overflow: visible;
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /* Keep the orientation implementation mounted but hide its controls. */
+
+
+
+
+
+
+
+
+  .twin-panel .orientation-shell,
+
+
+
+
+
+
+
+
+  .twin-panel .orientation-controls {
+
+
+
+
+
+
+
+
+    display: none !important;
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .twin-panel .twin-model-surface {
+
+
+
+
+
+
+
+
+    position: relative;
+
+
+
+
+
+
+
+
+    display: block;
+
+
+
+
+
+
+
+
+    flex: 0 0 auto !important;
+
+
+
+
+
+
+
+
+    width: 100%;
+
+
+
+
+
+
+
+
+    height: var(--pd1-twin-model-height) !important;
+
+
+
+
+
+
+
+
+    min-height: 280px !important;
+
+
+
+
+
+
+
+
+    overflow: hidden;
+
+
+
+
+
+
+
+
+    border-radius: var(--radius-sm, 6px);
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .twin-panel #avatar {
+
+
+
+
+
+
+
+
+    position: relative;
+
+
+
+
+
+
+
+
+    display: block;
+
+
+
+
+
+
+
+
+    width: 100%;
+
+
+
+
+
+
+
+
+    height: 100% !important;
+
+
+
+
+
+
+
+
+    min-height: 0 !important;
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .twin-panel #avatar canvas {
+
+
+
+
+
+
+
+
+    display: block;
+
+
+
+
+
+
+
+
+    max-width: 100%;
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .twin-panel .twin-model-message {
+
+
+
+
+
+
+
+
+    position: absolute;
+
+
+
+
+
+
+
+
+    inset: 0;
+
+
+
+
+
+
+
+
+    overflow: auto;
+
+
+
+
+
+
+
+
+    padding: var(--space-3, 12px);
+
+
+
+
+
+
+
+
+    background: var(--color-surface);
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .twin-panel .pd1-depth-note {
+
+
+
+
+
+
+
+
+    margin: var(--space-2, 8px) var(--space-3, 12px);
+
+
+
+
+
+
+
+
+    color: var(--color-text-muted);
+
+
+
+
+
+
+
+
+    font-size: var(--text-xs, 1rem);
+
+
+
+
+
+
+
+
+    line-height: 1.4;
+
+
+
+
+
+
+
+
+    overflow-wrap: anywhere;
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  @media (max-width: 800px) {
+
+
+
+
+
+
+
+
+    :root {
+
+
+
+
+
+
+
+
+      --pd1-twin-model-height: 320px;
+
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+</style>
+
+
+
+
+
+
+
+
+<!-- PD1 TWIN PANEL EXTENSION END -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style>
+.twin-selector { display:none !important; }
+</style>
+</head>
+
+
+
+
+
+
+
+
+  <body>
+
+
+
+
+
+
+
+
+    <a class="skip-link" href="#main">Skip to content</a>
+
+
+
+
+
+
+
+
+    <header class="app-header">
+
+
+
+
+
+
+
+
+      <a class="brand" href="#start" aria-label="PD1 exercise station home">
+
+
+
+
+
+
+
+
+        <svg
+
+
+
+
+
+
+
+
+          width="38"
+
+
+
+
+
+
+
+
+          height="38"
+
+
+
+
+
+
+
+
+          viewBox="0 0 38 38"
+
+
+
+
+
+
+
+
+          fill="none"
+
+
+
+
+
+
+
+
+          aria-hidden="true"
+
+
+
+
+
+
+
+
+        >
+
+
+
+
+
+
+
+
+          <path
+
+
+
+
+
+
+
+
+            d="M7 29V9h10a7 7 0 0 1 0 14H7m16-9 8-5v20"
+
+
+
+
+
+
+
+
+            stroke="currentColor"
+
+
+
+
+
+
+
+
+            stroke-width="3.5"
+
+
+
+
+
+
+
+
+            stroke-linejoin="round"
+
+
+
+
+
+
+
+
+          />
+
+
+
+
+
+
+
+
+        </svg>
+
+
+
+
+
+
+
+
+        <span>PD1 <span class="brand-sub">Digital Twin Station</span></span>
+
+
+
+
+
+
+
+
+      </a>
+
+
+
+
+
+
+
+
+      <div class="header-actions">
+
+
+
+
+
+
+<button id="rehab-about-open" type="button" class="btn compact">About / References</button>
+
+
+
+
+
+
+
+
+        <span id="connection" class="connection" role="status"
+
+
+
+
+
+
+
+
+          >Connecting to station…</span
+
+
+
+
+
+
+
+
+        >
+
+
+
+
+
+
+
+
+        <button
+
+
+
+
+
+
+
+
+          type="button"
+
+
+
+
+
+
+
+
+          id="theme-toggle"
+
+
+
+
+
+
+
+
+          class="btn compact"
+
+
+
+
+
+
+
+
+          aria-pressed="false"
+
+
+
+
+
+
+
+
+        >
+
+
+
+
+
+
+
+
+          Dark mode
+
+
+
+
+
+
+
+
+        </button>
+
+
+
+
+
+
+
+
+      </div>
+
+
+
+
+
+
+
+
+    </header>
+
+
+
+
+
+
+
+
+
+
+
+<!-- PD1 clinical mode warning: retained until approved integration is ready -->
+
+
+
+
+
+
+<p id="pd1-clinical-mode-banner" class="hint"
+   style="margin:8px 16px;">
+  Research/demo use only; not clinically validated.
+  Decision authority remains with the patient and the physical therapist.
+  This tool does not diagnose.
+</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <main id="main">
+
+
+
+
+
+
+
+
+      <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <section
+
+
+
+
+
+
+
+
+        id="screen-start"
+
+
+
+
+
+
+
+
+        class="screen page"
+
+
+
+
+
+
+
+
+        aria-labelledby="start-title"
+
+
+
+
+
+
+
+
+      >
+
+
+
+
+
+
+
+
+        <div class="page-heading">
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <p class="eyebrow">Your prescribed exercise</p>
+
+
+
+
+
+
+
+
+            <h1 id="start-title" tabindex="-1">Ready when you are.</h1>
+
+
+
+
+
+
+
+
+            <p>
+
+
+
+
+
+
+
+
+              Select your patient and exercise. We will guide you one step at a
+
+
+
+
+
+
+
+
+              time.
+
+
+
+
+
+
+
+
+            </p>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <button id="open-history" type="button" class="btn">
+
+
+
+
+
+
+
+
+            My sessions <span aria-hidden="true">↗</span>
+
+
+
+
+
+
+
+
+          </button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <div class="start-grid">
+
+
+
+
+
+
+
+
+          <form id="start-form" class="setup-card">
+
+
+
+
+
+
+
+
+            <div class="section-label">
+
+
+
+
+
+
+
+
+              <span class="step-number">1</span>
+
+
+
+
+
+
+
+
+              <h2>Set up your session</h2>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+            <label for="patient">Patient</label
+
+
+
+
+
+
+
+
+            ><select id="patient" required aria-describedby="patient-help">
+
+
+
+
+
+
+
+
+              <option value="">Loading patients…</option>
+
+
+
+
+
+
+
+
+            </select>
+
+
+
+
+
+
+
+
+            <p id="patient-help" class="hint">
+
+
+
+
+
+
+
+
+              Loaded through the local station.
+
+
+
+
+
+
+
+
+            </p>
+
+
+
+
+
+
+
+
+            <label for="prescription">Prescribed exercise</label
+
+
+
+
+
+
+
+
+            ><select id="prescription" required disabled>
+
+
+
+
+
+
+
+
+              <option value="">Choose a patient first</option>
+
+
+
+
+
+
+
+
+            </select>
+
+
+
+
+
+
+
+
+            <fieldset class="side-field">
+
+
+
+
+
+
+
+
+              <legend>Affected side</legend>
+
+
+
+
+
+
+
+
+              <div class="side-options">
+
+
+
+
+
+
+
+
+                <label
+
+
+
+
+
+
+
+
+                  ><input type="radio" name="side" value="left" checked /> Left
+
+
+
+
+
+
+
+
+                  leg</label
+
+
+
+
+
+
+
+
+                ><label
+
+
+
+
+
+
+
+
+                  ><input type="radio" name="side" value="right" /> Right
+
+
+
+
+
+
+
+
+                  leg</label
+
+
+
+
+
+
+
+
+                >
+
+
+
+
+
+
+
+
+              </div>
+
+
+
+
+
+
+
+
+            </fieldset>
+
+
+
+
+
+
+
+
+            <div class="prescription-facts">
+
+
+
+
+
+
+
+
+              <div><b id="setup-reps">—</b><span>Target repetitions</span></div>
+
+
+
+
+
+
+
+
+              <div><b id="setup-time">—</b><span>Session time limit</span></div>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+            <button
+
+
+
+
+
+
+
+
+              id="start"
+
+
+
+
+
+
+
+
+              type="submit"
+
+
+
+
+
+
+
+
+              class="btn primary start-button"
+
+
+
+
+
+
+
+
+              disabled
+
+
+
+
+
+
+
+
+            >
+
+
+
+
+
+
+
+
+              <span aria-hidden="true">▶</span> Start exercise
+
+
+
+
+
+
+
+
+            </button>
+
+
+
+
+
+
+
+
+            <p class="hint">
+
+
+
+
+
+
+
+
+              A short still-position calibration begins first. Stop if you feel
+
+
+
+
+
+
+
+
+              pain or dizziness.
+
+
+
+
+
+
+
+
+            </p>
+
+
+
+
+
+
+
+
+          </form>
+
+
+
+
+
+
+
+
+          <aside class="preparation-card" aria-labelledby="prepare-title">
+
+
+
+
+
+
+
+
+            <div class="section-label">
+
+
+
+
+
+
+
+
+              <span class="step-number">2</span>
+
+
+
+
+
+
+
+
+              <h2 id="prepare-title">Before you begin</h2>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+            <div class="ready-visual" aria-hidden="true">
+
+
+
+
+
+
+
+
+              <span class="corner tl"></span><span class="corner tr"></span
+
+
+
+
+
+
+
+
+              ><span class="corner bl"></span><span class="corner br"></span
+
+
+
+
+
+
+
+
+              ><span class="person-icon"
+
+
+
+
+
+
+
+
+                ><i class="person-head"></i><i class="person-body"></i
+
+
+
+
+
+
+
+
+                ><i class="person-arms"></i><i class="person-legs"></i></span
+
+
+
+
+
+
+
+
+              ><span class="visual-caption">Keep your whole leg in view</span>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+            <h3 id="preview-name">Choose a prescribed exercise</h3>
+
+
+
+
+
+
+
+
+            <p id="preview-view">
+
+
+
+
+
+
+
+
+              Position your camera so your hip, knee, ankle, and foot are
+
+
+
+
+
+
+
+
+              visible.
+
+
+
+
+
+
+
+
+            </p>
+
+
+
+
+
+
+
+
+            <ol id="instructions" class="instruction-list">
+
+
+
+
+
+
+
+
+              <li>Use a clear, well-lit space.</li>
+
+
+
+
+
+
+
+
+              <li>Follow your rehabilitation staff’s instructions.</li>
+
+
+
+
+
+
+
+
+              <li>Hold still when calibration begins.</li>
+
+
+
+
+
+
+
+
+            </ol>
+
+
+
+
+
+
+
+
+            <label class="audio-setting"
+
+
+
+
+
+
+
+
+              ><input id="audio" type="checkbox" checked /> Voice guidance
+
+
+
+
+
+
+
+
+              enabled</label
+
+
+
+
+
+
+
+
+            >
+
+
+
+
+
+
+
+
+            <p class="hint privacy">
+
+
+
+
+
+
+
+
+              Camera images stay on this station. Session results can sync to
+
+
+
+
+
+
+
+
+              the backend.
+
+
+
+
+
+
+
+
+            </p>
+
+
+
+
+
+
+
+
+          </aside>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <details class="diagnostics">
+
+
+
+
+
+
+
+
+          <summary>Station connection and diagnostics</summary>
+
+
+
+
+
+
+
+
+          <div class="diagnostic-values">
+
+
+
+
+
+
+
+
+            <span id="backend">Backend: checking…</span
+
+
+
+
+
+
+
+
+            ><span id="sync">Sync: checking…</span
+
+
+
+
+
+
+
+
+            ><span id="fps">Camera: waiting…</span
+
+
+
+
+
+
+
+
+            ><span id="tris">Avatar: loading…</span>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <button id="reload-patients" type="button" class="btn compact">
+
+
+
+
+
+
+
+
+            Reload patients
+
+
+
+
+
+
+
+
+          </button>
+
+
+
+
+
+
+
+
+        </details>
+
+
+
+
+
+
+
+
+      </section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <section
+
+
+
+
+
+
+
+
+        id="screen-live"
+
+
+
+
+
+
+
+
+        class="screen live-screen"
+
+
+
+
+
+
+
+
+        aria-labelledby="live-title"
+
+
+
+
+
+
+
+
+        hidden
+
+
+
+
+
+
+
+
+      >
+
+
+
+
+
+
+
+
+        <div class="live-heading">
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <p class="eyebrow" id="live-patient">Exercise session</p>
+
+
+
+
+
+
+
+
+            <h1 id="live-title" tabindex="-1">Your exercise</h1>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <span id="phase" class="phase-label">Calibrating</span>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <div class="live-stage">
+
+
+
+
+
+
+
+
+          <div class="camera-surface">
+
+
+
+
+
+
+
+
+            <img
+
+
+
+
+
+
+
+
+              id="camera"
+
+
+
+
+
+
+
+
+              alt="Live camera showing the exercising leg and tracked joints"
+
+
+
+
+
+
+
+
+              width="1280"
+
+
+
+
+
+
+
+
+              height="720"
+
+
+
+
+
+
+
+
+            />
+
+
+
+
+
+
+
+
+            <p id="camera-error" class="camera-error" hidden></p>
+
+
+
+
+
+
+
+
+            <span class="camera-label">LIVE CAMERA · LOCAL ONLY</span>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div class="live-left">
+
+
+
+
+
+
+
+
+            <div
+
+
+
+
+
+
+
+
+              id="rep-progress"
+
+
+
+
+
+
+
+
+              class="rep-progress"
+
+
+
+
+
+
+
+
+              role="progressbar"
+
+
+
+
+
+
+
+
+              aria-label="Valid repetitions completed"
+
+
+
+
+
+
+
+
+              aria-valuemin="0"
+
+
+
+
+
+
+
+
+              aria-valuemax="10"
+
+
+
+
+
+
+
+
+              aria-valuenow="0"
+
+
+
+
+
+
+
+
+            >
+
+
+
+
+
+
+
+
+              <div><b id="reps-left">—</b><span>reps left</span></div>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+            <p id="rep-detail" class="rep-detail">Waiting for session</p>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div
+
+
+
+
+
+
+
+
+            id="prompt"
+
+
+
+
+
+
+
+
+            class="coaching info"
+
+
+
+
+
+
+
+
+            role="status"
+
+
+
+
+
+
+
+
+            aria-live="polite"
+
+
+
+
+
+
+
+
+            aria-atomic="true"
+
+
+
+
+
+
+
+
+          >
+
+
+
+
+
+
+
+
+            <span id="prompt-symbol" aria-hidden="true">●</span
+
+
+
+
+
+
+
+
+            ><span id="prompt-text">Hold still in the starting position.</span>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <aside class="twin-panel twin-single" data-design="component" aria-labelledby="twin-title">
+
+
+
+
+
+
+
+
+            <h2 id="twin-title">DIGITAL TWIN</h2>
+
+
+
+
+
+
+
+
+            <div class="twin-selector">
+
+
+
+
+
+
+
+
+              <label for="twin-design">View design</label>
+
+
+
+
+
+
+
+
+              <select id="twin-design" aria-controls="twin-viewport"><option value="system">Design C</option></select>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+            <section id="twin-viewport" class="twin-view" aria-labelledby="twin-view-title">
+
+
+
+
+
+
+
+
+              <h3 id="twin-view-title">A · Component-level</h3>
+
+
+
+
+
+
+
+
+              <div id="component-controls">
+
+
+
+
+
+
+
+
+                <div class="joint-tabs" role="group" aria-label="Inspect one joint">
+
+
+
+
+
+
+
+
+                  <button type="button" data-joint="hip" aria-pressed="false">Hip</button>
+
+
+
+
+
+
+
+
+                  <button type="button" data-joint="knee" aria-pressed="true">Knee</button>
+
+
+
+
+
+
+
+
+                  <button type="button" data-joint="ankle" aria-pressed="false">Ankle</button>
+
+
+
+
+
+
+
+
+                </div>
+
+
+
+
+
+
+
+
+                <button id="twin-auto-joint" type="button" class="twin-text-button" aria-pressed="true">Exercise joint: automatic</button>
+
+
+
+
+
+
+
+
+              </div>
+
+
+
+
+
+
+
+
+              <div class="twin-model-surface">
+
+
+
+
+
+
+
+
+                <div id="avatar" role="img" aria-label="Design A skeleton: selected joint close-up" aria-busy="true"></div>
+
+
+
+
+
+
+
+
+                <div id="twin-model-message" class="twin-model-message" role="status" aria-live="polite" aria-atomic="true">
+
+
+
+
+
+
+
+
+                  <b id="twin-message-title">Loading Design A</b>
+
+
+
+
+
+
+
+
+                  <p id="twin-message-body">Loading your skeleton model.</p>
+
+
+
+
+
+
+
+
+                  <button id="twin-retry" type="button" class="btn compact" hidden>Retry model</button>
+
+
+
+
+
+
+
+
+                </div>
+
+
+
+
+
+
+
+
+              </div>
+
+
+
+
+
+
+
+
+              
+
+
+
+
+
+
+
+
+<p id="pd1-depth-note" class="hint pd1-depth-note">
+
+
+
+
+
+
+
+
+  Research mode: camera-inferred depth. Exercise thresholds require
+
+
+
+
+
+
+
+
+  3D validation. Orientation is held when tracking is uncertain.
+
+
+
+
+
+
+
+
+</p>
+
+
+
+
+
+
+
+
+<div class="twin-camera-controls">
+
+
+
+
+
+
+
+
+                <label><input id="twin-follow" type="checkbox" checked /> Follow movement</label>
+
+
+
+
+
+
+
+
+                <button id="twin-recenter" type="button">Recenter</button>
+
+
+
+
+
+
+
+
+              </div>
+
+
+
+
+
+
+
+
+              <div id="component-readings">
+
+
+
+
+
+
+
+
+                <div class="component-reading"><b id="component-angle">—</b><span id="component-state">Waiting for tracking</span></div>
+
+
+
+
+
+
+
+
+                <p id="component-rom" class="hint">Measured ROM: —</p>
+
+
+
+
+
+
+
+
+              </div>
+
+
+
+
+
+
+
+
+              <div id="asset-readings" hidden><p id="asset-tracking" class="asset-caption">Hip · Knee · Ankle</p></div>
+
+
+
+
+
+
+
+
+              <div id="system-readings" hidden>
+
+
+
+
+
+
+
+
+                <div id="joint-chain" class="joint-chain"></div>
+
+
+
+
+
+
+
+
+                <p id="system-status" class="system-status">Waiting for tracking</p>
+
+
+
+
+
+
+
+
+                <p class="hint">Whole-body model view only. v5 does not measure trunk compensation or bilateral coordination.</p>
+
+
+
+
+
+
+
+
+              </div>
+
+
+
+
+
+
+
+
+              <p id="twin-model-status" class="twin-model-status" role="status" aria-live="polite">Preparing Design A.</p>
+
+
+
+
+
+
+
+
+              <p id="avatar-error" class="hint" hidden>3D view unavailable. Joint measurements remain available.</p>
+
+
+
+
+
+
+
+
+              <p id="twin-attribution" class="twin-attribution" hidden></p>
+
+
+
+
+
+
+
+
+            </section>
+
+
+
+
+
+
+
+
+          </aside>
+
+
+
+
+
+
+
+
+          <div class="live-controls">
+
+
+
+
+
+
+
+
+            <button id="pause" type="button" class="btn live-button">
+
+
+
+
+
+
+
+
+              <span id="pause-icon" aria-hidden="true">Ⅱ</span
+
+
+
+
+
+
+
+
+              ><span id="pause-text">Pause</span></button
+
+
+
+
+
+
+
+
+            ><button
+
+
+
+
+
+
+
+
+              id="voice"
+
+
+
+
+
+
+
+
+              type="button"
+
+
+
+
+
+
+
+
+              class="btn live-button"
+
+
+
+
+
+
+
+
+              aria-pressed="true"
+
+
+
+
+
+
+
+
+            >
+
+
+
+
+
+
+
+
+              <span aria-hidden="true">◖))</span
+
+
+
+
+
+
+
+
+              ><span id="voice-text">Voice on</span>
+
+
+
+
+
+
+
+
+            </button>
+
+
+
+
+
+
+
+
+            <div class="time-left">
+
+
+
+
+
+
+
+
+              <span>Time left</span><b id="timer" role="timer">—:—</b>
+
+
+
+
+
+
+
+
+            </div>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <button id="stop" type="button" class="btn danger stop-button">
+
+
+
+
+
+
+
+
+            <span aria-hidden="true">■</span> STOP
+
+
+
+
+
+
+
+
+          </button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <div class="live-footnote">
+
+
+
+
+
+
+
+
+          <span id="camera-view">Keep your affected leg in view.</span
+
+
+
+
+
+
+
+
+          ><span id="live-arom">ROM: waiting for movement</span>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <details class="joint-details">
+
+
+
+
+
+
+
+
+          <summary>Detailed joint measurements</summary>
+
+
+
+
+
+
+
+
+          <div class="table-wrap">
+
+
+
+
+
+
+
+
+            <table id="joints">
+
+
+
+
+
+
+
+
+              <caption class="sr-only">
+
+
+
+
+
+
+
+
+                Live component twin measurements
+
+
+
+
+
+
+
+
+              </caption>
+
+
+
+
+
+
+
+
+              <thead>
+
+
+
+
+
+
+
+
+                <tr>
+
+
+
+
+
+
+
+
+                  <th scope="col">Joint</th>
+
+
+
+
+
+
+
+
+                  <th scope="col">Angle</th>
+
+
+
+
+
+
+
+
+                  <th scope="col">Velocity</th>
+
+
+
+
+
+
+
+
+                  <th scope="col">Measured ROM</th>
+
+
+
+
+
+
+
+
+                  <th scope="col">Hold</th>
+
+
+
+
+
+
+
+
+                </tr>
+
+
+
+
+
+
+
+
+              </thead>
+
+
+
+
+
+
+
+
+              <tbody></tbody>
+
+
+
+
+
+
+
+
+            </table>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+        </details>
+
+
+
+
+
+
+
+
+        <section
+
+
+
+
+
+
+
+
+          id="calibration"
+
+
+
+
+
+
+
+
+          class="calibration-controls"
+
+
+
+
+
+
+
+
+          hidden
+
+
+
+
+
+
+
+
+          aria-label="Avatar calibration"
+
+
+
+
+
+
+
+
+        >
+
+
+
+
+
+
+
+
+          <label for="cal-hip">Hip</label
+
+
+
+
+
+
+
+
+          ><input type="range" id="cal-hip" min="0" max="140" value="0" /><label
+
+
+
+
+
+
+
+
+            for="cal-knee"
+
+
+
+
+
+
+
+
+            >Knee</label
+
+
+
+
+
+
+
+
+          ><input
+
+
+
+
+
+
+
+
+            type="range"
+
+
+
+
+
+
+
+
+            id="cal-knee"
+
+
+
+
+
+
+
+
+            min="0"
+
+
+
+
+
+
+
+
+            max="140"
+
+
+
+
+
+
+
+
+            value="0"
+
+
+
+
+
+
+
+
+          /><label for="cal-ankle">Ankle</label
+
+
+
+
+
+
+
+
+          ><input type="range" id="cal-ankle" min="-40" max="40" value="0" />
+
+
+
+
+
+
+
+
+        </section>
+
+
+
+
+
+
+
+
+      </section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <section
+
+
+
+
+
+
+
+
+        id="screen-summary"
+
+
+
+
+
+
+
+
+        class="screen page summary-page"
+
+
+
+
+
+
+
+
+        aria-labelledby="summary-title"
+
+
+
+
+
+
+
+
+        hidden
+
+
+
+
+
+
+
+
+      >
+
+
+
+
+
+
+
+
+        <p class="eyebrow">Exercise session saved locally</p>
+
+
+
+
+
+
+
+
+        <h1 id="summary-title" tabindex="-1">Session finished</h1>
+
+
+
+
+
+
+
+
+        <p id="summary-exercise" class="summary-subtitle"></p>
+
+
+
+
+
+
+
+
+        <p id="summary-status" class="summary-status"></p>
+
+
+
+
+
+
+
+
+        <div class="summary-metrics">
+
+
+
+
+
+
+
+
+          <div class="result-metric">
+
+
+
+
+
+
+
+
+            <b id="summary-valid">—</b><span>Valid reps</span>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div class="result-metric">
+
+
+
+
+
+
+
+
+            <b id="summary-invalid">—</b><span>Invalid reps</span>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div class="result-metric">
+
+
+
+
+
+
+
+
+            <b id="summary-rom">—</b
+
+
+
+
+
+
+
+
+            ><span>Peak ROM <small>(median rep peak)</small></span>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <dl class="summary-details">
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <dt>Incomplete reps</dt>
+
+
+
+
+
+
+
+
+            <dd id="summary-incomplete">—</dd>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <dt>Active duration</dt>
+
+
+
+
+
+
+
+
+            <dd id="summary-duration">—</dd>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <dt>Range of motion</dt>
+
+
+
+
+
+
+
+
+            <dd id="summary-arom">—</dd>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <dt>Backend sync</dt>
+
+
+
+
+
+
+
+
+            <dd id="summary-sync">Pending</dd>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+        </dl>
+
+
+
+
+
+
+
+
+        <p id="summary-empty" class="hint" hidden>
+
+
+
+
+
+
+
+
+          No session summary is available yet. Start an exercise to record one.
+
+
+
+
+
+
+
+
+        </p>
+
+
+
+
+
+
+
+
+        <div class="summary-actions">
+
+
+
+
+
+
+
+
+          <button type="button" id="start-again" class="btn primary">
+
+
+
+
+
+
+
+
+            <span aria-hidden="true">▶</span> Start again</button
+
+
+
+
+
+
+
+
+          ><button type="button" id="summary-history" class="btn">
+
+
+
+
+
+
+
+
+            My sessions <span aria-hidden="true">≡</span>
+
+
+
+
+
+
+
+
+          </button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <button type="button" id="summary-home" class="text-button">
+
+
+
+
+
+
+
+
+          Back to start
+
+
+
+
+
+
+
+
+        </button>
+
+
+
+
+
+
+
+
+      </section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <section
+
+
+
+
+
+
+
+
+        id="screen-sessions"
+
+
+
+
+
+
+
+
+        class="screen page"
+
+
+
+
+
+
+
+
+        aria-labelledby="sessions-title"
+
+
+
+
+
+
+
+
+        hidden
+
+
+
+
+
+
+
+
+      >
+
+
+
+
+
+
+
+
+        <div class="page-heading">
+
+
+
+
+
+
+
+
+          <div>
+
+
+
+
+
+
+
+
+            <p class="eyebrow">This device</p>
+
+
+
+
+
+
+
+
+            <h1 id="sessions-title" tabindex="-1">Recent local sessions</h1>
+
+
+
+
+
+
+
+
+            <p>Saved exercise records and their backend sync status.</p>
+
+
+
+
+
+
+
+
+          </div>
+
+
+
+
+
+
+
+
+          <button type="button" id="history-back" class="btn">← Back</button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <div class="history-tools">
+
+
+
+
+
+
+
+
+          <label for="history-patient"
+
+
+
+
+
+
+
+
+            >Show patient<select id="history-patient">
+
+
+
+
+
+
+
+
+              <option value="all">All local patients</option>
+
+
+
+
+
+
+
+
+            </select></label
+
+
+
+
+
+
+
+
+          ><button type="button" id="refresh-sessions" class="btn">
+
+
+
+
+
+
+
+
+            Refresh</button
+
+
+
+
+
+
+
+
+          ><button type="button" id="sync-now" class="btn">Sync now</button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <p
+
+
+
+
+
+
+
+
+          id="history-status"
+
+
+
+
+
+
+
+
+          class="hint"
+
+
+
+
+
+
+
+
+          role="status"
+
+
+
+
+
+
+
+
+          aria-live="polite"
+
+
+
+
+
+
+
+
+        ></p>
+
+
+
+
+
+
+
+
+        <div class="history-table table-wrap">
+
+
+
+
+
+
+
+
+          <table id="sessions">
+
+
+
+
+
+
+
+
+            <caption class="sr-only">
+
+
+
+
+
+
+
+
+              Recent local exercise sessions
+
+
+
+
+
+
+
+
+            </caption>
+
+
+
+
+
+
+
+
+            <thead>
+
+
+
+
+
+
+
+
+              <tr>
+
+
+
+
+
+
+
+
+                <th scope="col">Date</th>
+
+
+
+
+
+
+
+
+                <th scope="col">Exercise / patient</th>
+
+
+
+
+
+
+
+
+                <th scope="col">Valid</th>
+
+
+
+
+
+
+
+
+                <th scope="col">Status</th>
+
+
+
+
+
+
+
+
+                <th scope="col">Synced</th>
+
+
+
+
+
+
+
+
+              </tr>
+
+
+
+
+
+
+
+
+            </thead>
+
+
+
+
+
+
+
+
+            <tbody></tbody>
+
+
+
+
+
+
+
+
+          </table>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <div id="history-empty" class="empty-state" hidden>
+
+
+
+
+
+
+
+
+          <h2>Your sessions will appear here.</h2>
+
+
+
+
+
+
+
+
+          <p>Finish your first prescribed exercise to save a local record.</p>
+
+
+
+
+
+
+
+
+          <button type="button" id="empty-start" class="btn primary">
+
+
+
+
+
+
+
+
+            Go to start
+
+
+
+
+
+
+
+
+          </button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <p class="hint history-note">
+
+
+
+
+
+
+
+
+          Synced records remain visible here. Pending or failed records stay on
+
+
+
+
+
+
+
+
+          this device until sync succeeds.
+
+
+
+
+
+
+
+
+        </p>
+
+
+
+
+
+
+
+
+      </section>
+
+
+
+
+
+
+
+
+    </main>
+
+
+
+
+
+
+
+
+    <footer class="app-footer">
+
+
+
+
+
+
+
+
+      <span>QMMC · PD1 rehabilitation proof of concept</span
+
+
+
+
+
+
+
+
+      ><span>Follow your rehabilitation team’s advice.</span>
+
+
+
+
+
+
+
+
+    </footer>
+
+
+
+
+
+
+
+
+    <script type="module" src="/static/app.js?v=rehab-history-2"></script>
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+<!-- PD1_REHAB_ABOUT_V1 -->
+
+
+
+
+
+
+<style>
+
+
+
+
+
+
+#rehab-about-dialog {
+
+
+
+
+
+
+  margin:auto;width:min(900px,94vw);max-height:88dvh;
+
+
+
+
+
+
+  padding:24px;overflow:auto;border:2px solid var(--color-border);
+
+
+
+
+
+
+  border-radius:12px;background:var(--color-surface);color:var(--color-text);
+
+
+
+
+
+
+  font:inherit;
+
+
+
+
+
+
+}
+
+
+
+
+
+
+#rehab-about-dialog::backdrop {background:rgba(0,0,0,.65)}
+
+
+
+
+
+
+#rehab-about-dialog h2,#rehab-about-dialog h3 {
+
+
+
+
+
+
+  margin-block:16px 8px;
+
+
+
+
+
+
+}
+
+
+
+
+
+
+#rehab-about-dialog p,#rehab-about-dialog li {margin-block:8px}
+
+
+
+
+
+
+#rehab-about-dialog ul {padding-left:24px}
+
+
+
+
+
+
+#rehab-about-dialog th,#rehab-about-dialog td {
+
+
+
+
+
+
+  padding:8px;text-align:left;border-bottom:1px solid var(--color-border);
+
+
+
+
+
+
+}
+
+
+
+
+
+
+#rehab-about-dialog a {color:var(--color-link)}
+
+
+
+
+
+
+</style>
+
+
+
+
+
+
+<dialog id="rehab-about-dialog" aria-labelledby="rehab-about-title">
+
+
+
+
+
+
+  <button id="rehab-about-close" type="button" class="btn compact"
+
+
+
+
+
+
+    autofocus>Close About</button>
+
+
+
+
+
+
+  <h2 id="rehab-about-title">About this rehabilitation extension</h2>
+
+
+
+
+
+
+  <p>Decision authority remains with the patient and the physical therapist. This tool does not diagnose.</p>
+
+
+
+
+
+
+  <p>Research prototype. The new clinical extension is not approved for
+
+
+
+
+
+
+     deployment. Legacy evaluation and extension previews remain separate.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h3>Population ROM documentation</h3>
+
+
+
+
+
+
+  <p>AAOS values as reproduced in Norkin &amp; White</p>
+
+
+
+
+
+
+  <p>Edition and table verification pending.
+
+
+
+
+
+
+     Reference edition: Not set.</p>
+
+
+
+
+
+
+  <table>
+
+
+
+
+
+
+    <thead><tr><th scope="col">Movement</th>
+
+
+
+
+
+
+    <th scope="col">Reference peak</th></tr></thead>
+
+
+
+
+
+
+    <tbody><tr><th scope='row'>hip flexion</th><td>120°</td></tr><tr><th scope='row'>knee flexion</th><td>135°</td></tr><tr><th scope='row'>knee extension</th><td>0°</td></tr><tr><th scope='row'>ankle dorsiflexion</th><td>20°</td></tr><tr><th scope='row'>ankle plantarflexion</th><td>50°</td></tr></tbody>
+
+
+
+
+
+
+  </table>
+
+
+
+
+
+
+  <p>These references are not safety limits, redness triggers, or exercise
+
+
+
+
+
+
+     targets. SLR requires a PT-set knee-extended expected AROM, not the
+
+
+
+
+
+
+     general 120° hip-flexion reference. Ankle measurements require knee
+
+
+
+
+
+
+     position documentation. Patient-specific reference overrides are allowed.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h3>References and limitations</h3>
+
+
+
+
+
+
+  <ul><li><h3>Measurement of Joint Motion: A Guide to Goniometry</h3><p>Conventions, landmarks, alignment, positions, neutral-zero</p><p>status: PT must confirm edition and relevant tables</p><p>authors: Norkin &amp; White</p><p>edition: Not set</p></li><li><h3>Total Knee Replacement Exercise Guide</h3><p>Exercise instructions and positioning only</p><p>limitation: Postoperative knee-replacement guidance; not an OA protocol for patients without a replacement. Not a source of AAOS-compliant thresholds.</p><p><a href="https://orthoinfo.aaos.org/en/recovery/total-knee-replacement-exercise-guide/" target="_blank" rel="noopener noreferrer">Open reference</a></p></li><li><h3>Royal Devon SLR protocol</h3><p></p><p>status: Exact leaflet/version and wording require verification</p><p>requested_rule: Foot at 90 degrees to shin; optional ankle rule</p></li><li><h3>Sirona prone knee flexion protocol</h3><p></p><p>status: Exact leaflet/version and wording require verification</p><p>requested_rule: Hip straight and ankle flexed; numerical interpretation requires PT approval</p></li><li><h3>PT-approved project protocol</h3><p>Patient targets, tolerances, and feedback interpretation</p><p>status: Not approved</p></li></ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h3>Configuration status at installation</h3>
+
+
+
+
+
+
+  <ul><li>ankle pumps: Not approved</li><li>straight leg raise: Not approved</li><li>prone knee flexion: Not approved</li></ul>
+
+
+
+
+
+
+  <p>This page is a configuration snapshot, not approval verification.
+
+
+
+
+
+
+     Do not treat an approval flag alone as permission for clinical use.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h3>PT_SET parameters</h3>
+
+
+
+
+
+
+  <p>Moving-joint ranges, endpoints and tolerances; supporting-joint targets
+
+
+
+
+
+
+     where unspecified and all tolerances; redness scales; repetition
+
+
+
+
+
+
+     thresholds, timing and hold requirements; WNL tolerances;
+
+
+
+
+
+
+     knee-extended SLR expected AROM; patient reference overrides;
+
+
+
+
+
+
+     tracking visibility and filter parameters.</p>
+
+
+
+
+
+
+  <p>Supplied PT_SET values remain null until a PT enters and approves them.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h3>Visual feedback</h3>
+
+
+
+
+
+
+  <p>Joint-position deviation: color intensity indicates departure from your prescribed exercise limits.</p>
+
+
+
+
+
+
+  <p>Redness is not pain, injury, inflammation, measured joint stress,
+
+
+
+
+
+
+     or a diagnosis. Shared proportional-redness integration is pending.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h3>Validation</h3>
+
+
+
+
+
+
+  <p>The installed validation utility calculates descriptive comparisons.
+
+
+
+
+
+
+     Passing software tests does not establish clinical accuracy.
+
+
+
+
+
+
+     Real matched camera/goniometer readings and PT review are required.</p>
+
+
+
+
+
+
+</dialog>
+
+
+
+
+
+
+<script type="module" src="/static/rehab-about.js?v=1"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- PD1_REHAB_WEB_BRIDGE_V1 -->
+
+
+
+
+<script type="module" src="/static/rehab-web-bridge.js?v=1"></script>
+
+
+
+
+</body>
+
+
+
+
+
+
+
+
+</html>
+
+
+
+
+
+
+
+

@@ -1,0 +1,59 @@
+{
+  "model_url": "/avatar/Design%20C/scene.glb",
+  "model_yaw_deg": 0,
+  "bones": {
+    "left": {
+      "hip": "CC_Base_L_Thigh",
+      "knee": "CC_Base_L_Calf",
+      "ankle": "CC_Base_L_Foot"
+    },
+    "right": {
+      "hip": "CC_Base_R_Thigh",
+      "knee": "CC_Base_R_Calf",
+      "ankle": "CC_Base_R_Foot"
+    }
+  },
+  "sign": {
+    "hip_flexion": 1,
+    "hip_abduction": 1,
+    "hip_extension": 1,
+    "knee_flexion": 1,
+    "ankle_dorsiflexion": 1
+  },
+  "default_design": "system",
+  "designs": {
+    "system": {
+      "enabled": true,
+      "model_url": "/avatar/Design%20C/scene.glb",
+      "model_yaw_deg": 0,
+      "normalized_height_m": 1.7,
+      "bones": {
+        "left": {
+          "hip": "CC_Base_L_Thigh",
+          "knee": "CC_Base_L_Calf",
+          "ankle": "CC_Base_L_Foot"
+        },
+        "right": {
+          "hip": "CC_Base_R_Thigh",
+          "knee": "CC_Base_R_Calf",
+          "ankle": "CC_Base_R_Foot"
+        }
+      },
+      "sign": {
+        "hip_flexion": 1,
+        "hip_abduction": 1,
+        "hip_extension": 1,
+        "knee_flexion": 1,
+        "ankle_dorsiflexion": 1
+      },
+      "unavailable_message": "Design C needs its own rigged whole-body GLB/glTF and bone mapping. This patch does not include that model or add trunk/bilateral tracking.",
+      "attribution": {
+        "title": "CC3 Base Plus",
+        "author": "Reallusion",
+        "source": "https://www.reallusion.com/character-creator/free-3d-character-base.html",
+        "license": "Reallusion CC Base Model License",
+        "license_url": "https://www.reallusion.com/Content/EULA/AP/EULA_AP.htm"
+      }
+    }
+  }
+}

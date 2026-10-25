@@ -1,0 +1,38 @@
+{
+  "config_version": "rehab-extension-1",
+  "references": [
+    {
+      "id": "norkin_white",
+      "title": "Measurement of Joint Motion: A Guide to Goniometry",
+      "authors": "Norkin & White",
+      "edition": null,
+      "status": "PT must confirm edition and relevant tables",
+      "use": "Conventions, landmarks, alignment, positions, neutral-zero"
+    },
+    {
+      "id": "aaos_tkr",
+      "title": "Total Knee Replacement Exercise Guide",
+      "url": "https://orthoinfo.aaos.org/en/recovery/total-knee-replacement-exercise-guide/",
+      "use": "Exercise instructions and positioning only",
+      "limitation": "Postoperative knee-replacement guidance; not an OA protocol for patients without a replacement. Not a source of AAOS-compliant thresholds."
+    },
+    {
+      "id": "royal_devon_slr",
+      "title": "Royal Devon SLR protocol",
+      "status": "Exact leaflet/version and wording require verification",
+      "requested_rule": "Foot at 90 degrees to shin; optional ankle rule"
+    },
+    {
+      "id": "sirona_prone",
+      "title": "Sirona prone knee flexion protocol",
+      "status": "Exact leaflet/version and wording require verification",
+      "requested_rule": "Hip straight and ankle flexed; numerical interpretation requires PT approval"
+    },
+    {
+      "id": "pt_project",
+      "title": "PT-approved project protocol",
+      "status": "Not approved",
+      "use": "Patient targets, tolerances, and feedback interpretation"
+    }
+  ]
+}

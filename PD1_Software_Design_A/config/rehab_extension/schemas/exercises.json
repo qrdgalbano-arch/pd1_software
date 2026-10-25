@@ -1,0 +1,569 @@
+{
+  "type": "object",
+  "properties": {
+    "config_version": {
+      "type": "string"
+    },
+    "exercises": {
+      "type": "object",
+      "properties": {
+        "ankle_pumps": {
+          "type": "object",
+          "properties": {
+            "moving_joint": {
+              "type": "string"
+            },
+            "testing_position": {
+              "type": "string"
+            },
+            "approval": {
+              "type": "object",
+              "properties": {
+                "approved": {
+                  "type": "boolean"
+                },
+                "approved_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_config_sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "approved",
+                "approved_by",
+                "approved_at",
+                "approved_config_sha256"
+              ],
+              "additionalProperties": false
+            },
+            "moving_joint_protocol": {
+              "type": "object",
+              "properties": {
+                "range_min_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "range_max_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "target_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "target_tolerance_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "redness_full_scale_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "range_min_deg",
+                "range_max_deg",
+                "target_deg",
+                "target_tolerance_deg",
+                "redness_full_scale_deg"
+              ],
+              "additionalProperties": false
+            },
+            "repetition": {
+              "type": "object",
+              "properties": {
+                "start_threshold_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "return_threshold_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "minimum_duration_seconds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "required_hold_seconds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "start_threshold_deg",
+                "return_threshold_deg",
+                "minimum_duration_seconds",
+                "required_hold_seconds"
+              ],
+              "additionalProperties": false
+            },
+            "assessment": {
+              "type": "object",
+              "properties": {
+                "reference_override_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "wnl_tolerance_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "slr_expected_arom_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "reference_override_deg",
+                "wnl_tolerance_deg",
+                "slr_expected_arom_deg"
+              ],
+              "additionalProperties": false
+            },
+            "supporting_joints": {
+              "type": "object",
+              "properties": {
+                "hip": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "target_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "tolerance_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "redness_full_scale_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "pt_confirmation_required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "target_deg",
+                    "tolerance_deg",
+                    "redness_full_scale_deg",
+                    "pt_confirmation_required"
+                  ],
+                  "additionalProperties": false
+                },
+                "knee": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "target_deg": {
+                      "type": "number"
+                    },
+                    "tolerance_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "redness_full_scale_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "pt_confirmation_required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "target_deg",
+                    "tolerance_deg",
+                    "redness_full_scale_deg",
+                    "pt_confirmation_required"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "hip",
+                "knee"
+              ],
+              "additionalProperties": false
+            },
+            "directional_endpoints_deg": {
+              "type": "object",
+              "properties": {
+                "dorsiflexion": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "plantarflexion_magnitude": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "dorsiflexion",
+                "plantarflexion_magnitude"
+              ],
+              "additionalProperties": false
+            },
+            "assess_directions_separately": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "moving_joint",
+            "testing_position",
+            "approval",
+            "moving_joint_protocol",
+            "repetition",
+            "assessment",
+            "supporting_joints",
+            "directional_endpoints_deg",
+            "assess_directions_separately"
+          ],
+          "additionalProperties": false
+        },
+        "straight_leg_raise": {
+          "type": "object",
+          "properties": {
+            "moving_joint": {
+              "type": "string"
+            },
+            "testing_position": {
+              "type": "string"
+            },
+            "approval": {
+              "type": "object",
+              "properties": {
+                "approved": {
+                  "type": "boolean"
+                },
+                "approved_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_config_sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "approved",
+                "approved_by",
+                "approved_at",
+                "approved_config_sha256"
+              ],
+              "additionalProperties": false
+            },
+            "moving_joint_protocol": {
+              "type": "object",
+              "properties": {
+                "range_min_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "range_max_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "target_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "target_tolerance_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "redness_full_scale_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "range_min_deg",
+                "range_max_deg",
+                "target_deg",
+                "target_tolerance_deg",
+                "redness_full_scale_deg"
+              ],
+              "additionalProperties": false
+            },
+            "repetition": {
+              "type": "object",
+              "properties": {
+                "start_threshold_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "return_threshold_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "minimum_duration_seconds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "required_hold_seconds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "start_threshold_deg",
+                "return_threshold_deg",
+                "minimum_duration_seconds",
+                "required_hold_seconds"
+              ],
+              "additionalProperties": false
+            },
+            "assessment": {
+              "type": "object",
+              "properties": {
+                "reference_override_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "wnl_tolerance_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                },
+                "slr_expected_arom_deg": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "PT_SET: null until supplied and approved by the PT."
+                }
+              },
+              "required": [
+                "reference_override_deg",
+                "wnl_tolerance_deg",
+                "slr_expected_arom_deg"
+              ],
+              "additionalProperties": false
+            },
+            "supporting_joints": {
+              "type": "object",
+              "properties": {
+                "knee": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "target_deg": {
+                      "type": "number"
+                    },
+                    "tolerance_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "redness_full_scale_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "pt_confirmation_required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "target_deg",
+                    "tolerance_deg",
+                    "redness_full_scale_deg",
+                    "pt_confirmation_required"
+                  ],
+                  "additionalProperties": false
+                },
+                "ankle": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "target_deg": {
+                      "type": "number"
+                    },
+                    "tolerance_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "redness_full_scale_deg": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "PT_SET: null until supplied and approved by the PT."
+                    },
+                    "pt_confirmation_required": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "target_deg",
+                    "tolerance_deg",
+                    "redness_full_scale_deg",
+                    "pt_confirmation_required"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "knee",
+                "ankle"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "moving_joint",
+            "testing_position",
+            "approval",
+            "moving_joint_protocol",
+            "repetition",
+            "assessment",
+            "supporting_joints"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ankle_pumps",
+        "straight_leg_raise"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "config_version",
+    "exercises"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

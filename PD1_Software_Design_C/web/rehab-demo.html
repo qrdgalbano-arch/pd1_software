@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PD1 ? Isolated Rehabilitation Demo</title>
+<script type="importmap">
+{"imports":{"three":"/static/vendor/three/build/three.module.js",
+"three/addons/":"/static/vendor/three/examples/jsm/"}}
+</script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef2ef;color:#17271e;
+font:18px/1.5 system-ui,sans-serif}header,main{padding:16px}
+header{background:#173e2b;color:white}h1{font-size:26px;margin:0}
+.banner{padding:12px;background:#fff0bf;color:#362600}
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:16px}
+label{display:grid;gap:4px}button,select{font:inherit;padding:12px;min-height:48px}
+button{cursor:pointer;border:1px solid #607c6c;border-radius:6px}
+button:focus-visible,select:focus-visible{outline:3px solid #005cc8;outline-offset:3px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px}
+.camera{position:relative;background:#17271e;min-height:360px}
+.camera img{display:block;width:100%;height:100%;max-height:68vh;object-fit:contain}
+.twin{background:rgba(255,255,255,.90);border:1px solid #758b7b;
+padding:12px;border-radius:12px;min-width:0}
+#avatar{height:360px;width:100%;position:relative}
+#avatar canvas{display:block;max-width:100%}
+.orientation-shell,.orientation-controls{display:none!important}
+#prompt{padding:16px;background:#174f34;color:white;font-size:24px;
+font-weight:700;margin-bottom:16px}
+#prompt[data-critical="true"]{background:#8d1126}
+.metrics{display:flex;gap:24px;flex-wrap:wrap;margin:12px 0}
+.metric{font-size:28px;font-weight:bold}
+.stop{background:#b71931;color:white;border:3px solid #591020}
+#summary{margin-top:24px;padding:20px;background:white;border-radius:12px}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:8px;
+border-bottom:1px solid #b8c6bd}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+dialog{max-width:900px;width:95vw;max-height:85vh;overflow:auto;padding:24px}
+.small{font-size:15px}canvas.trend{display:block;width:100%;max-width:620px;background:#fff}
+@media(max-width:800px){.stage{grid-template-columns:1fr}.camera{min-height:240px}
+#avatar{height:320px}.controls>*{flex:1 1 150px}}
+</style>
+</head>
+<body>
+<header><h1>PD1 rehabilitation ? isolated demo</h1></header>
+<div class="banner">
+DEMO ONLY ? synthetic presets, inferred depth, no PT approval.
+Decision authority remains with the patient and the physical therapist.
+This tool does not diagnose.
+</div>
+<main>
+<div class="controls">
+<label>Exercise<select id="exercise">
+<option value="straight_leg_raise">Supine straight-leg raise</option>
+<option value="ankle_pumps">Lying ankle pumps</option>
+<option value="prone_knee_flexion">Prone knee flexion</option>
+</select></label>
+<label>Exercised leg<select id="side"><option value="left">Left</option>
+<option value="right">Right</option></select></label>
+<button id="start">Start demo exercise</button>
+<button id="neutral">Set demo neutral</button>
+<button id="pause">Pause / Resume</button>
+<button id="stop" class="stop">STOP</button>
+<button id="voice">Voice off</button>
+<button id="about">About / presets</button>
+</div>
+<p class="small">Start while in your intended neutral position.
+Hip zero is an engineering reference from the first tracked frame?not clinical calibration.</p>
+<div id="prompt">Demo ready.</div>
+<div class="metrics">
+<span class="metric" id="reps">0 completed</span>
+<span class="metric" id="timer">?</span>
+<span id="quality"></span>
+</div>
+<div class="stage">
+<div class="camera"><img src="/video.mjpg" alt="Local camera preview"></div>
+<aside class="twin">
+<label>Digital twin<select id="design">
+<option value="component">A ? component</option>
+<option value="asset">B ? affected leg crop</option>
+<option value="system">C ? whole body</option>
+</select></label>
+<div class="controls">
+<button data-joint="hip">Hip</button>
+<button data-joint="knee">Knee</button>
+<button data-joint="ankle">Ankle</button>
+</div>
+<div id="avatar" role="img" aria-label="Demo digital twin"></div>
+<p id="model-status" class="small">Loading model?</p>
+<button id="recenter">Recenter</button>
+<p class="small">Joint-position deviation: color intensity indicates departure
+from your prescribed exercise limits. In this demo, limits are synthetic presets.</p>
+<table><thead><tr><th>Joint</th><th>Angle</th><th>Demo state</th></tr></thead>
+<tbody id="readings"></tbody></table>
+</aside>
+</div>
+<section id="summary" hidden></section>
+<dialog id="dialog"><button id="close">Close</button>
+<h2>Demo settings and reference status</h2><pre id="reference-text"></pre></dialog>
+</main>
+<script type="module" src="/static/rehab-demo.js?v=1"></script>
+</body></html>

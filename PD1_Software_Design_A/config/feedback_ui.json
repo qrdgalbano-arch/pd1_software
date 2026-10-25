@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "minimum_display_seconds": 2.5,
+  "same_category_update_seconds": 4.0,
+  "priorities": {
+    "positioning": 100,
+    "wrong_leg_raised": 90,
+    "default_deviation": 80,
+    "too_fast": 75,
+    "over_range": 70,
+    "rep_invalid": 60,
+    "rep_incomplete": 55,
+    "tracking_ok": 30,
+    "rep_valid": 10,
+    "default": 20
+  }
+}

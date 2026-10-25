@@ -1,0 +1,142 @@
+{
+  "config_version": "rehab-extension-1",
+  "exercises": {
+    "ankle_pumps": {
+      "moving_joint": "ankle",
+      "testing_position": "supported lying",
+      "approval": {
+        "approved": false,
+        "approved_by": null,
+        "approved_at": null,
+        "approved_config_sha256": null
+      },
+      "moving_joint_protocol": {
+        "range_min_deg": null,
+        "range_max_deg": null,
+        "target_deg": null,
+        "target_tolerance_deg": null,
+        "redness_full_scale_deg": null
+      },
+      "repetition": {
+        "start_threshold_deg": null,
+        "return_threshold_deg": null,
+        "minimum_duration_seconds": null,
+        "required_hold_seconds": null
+      },
+      "assessment": {
+        "reference_override_deg": null,
+        "wnl_tolerance_deg": null,
+        "slr_expected_arom_deg": null
+      },
+      "supporting_joints": {
+        "hip": {
+          "enabled": true,
+          "target_deg": null,
+          "tolerance_deg": null,
+          "redness_full_scale_deg": null,
+          "pt_confirmation_required": false
+        },
+        "knee": {
+          "enabled": true,
+          "target_deg": 0,
+          "tolerance_deg": null,
+          "redness_full_scale_deg": null,
+          "pt_confirmation_required": false
+        }
+      },
+      "directional_endpoints_deg": {
+        "dorsiflexion": null,
+        "plantarflexion_magnitude": null
+      },
+      "assess_directions_separately": true
+    },
+    "straight_leg_raise": {
+      "moving_joint": "hip",
+      "testing_position": "supine with exercised knee extended",
+      "approval": {
+        "approved": false,
+        "approved_by": null,
+        "approved_at": null,
+        "approved_config_sha256": null
+      },
+      "moving_joint_protocol": {
+        "range_min_deg": null,
+        "range_max_deg": null,
+        "target_deg": null,
+        "target_tolerance_deg": null,
+        "redness_full_scale_deg": null
+      },
+      "repetition": {
+        "start_threshold_deg": null,
+        "return_threshold_deg": null,
+        "minimum_duration_seconds": null,
+        "required_hold_seconds": null
+      },
+      "assessment": {
+        "reference_override_deg": null,
+        "wnl_tolerance_deg": null,
+        "slr_expected_arom_deg": null
+      },
+      "supporting_joints": {
+        "knee": {
+          "enabled": true,
+          "target_deg": 0,
+          "tolerance_deg": null,
+          "redness_full_scale_deg": null,
+          "pt_confirmation_required": false
+        },
+        "ankle": {
+          "enabled": false,
+          "target_deg": 0,
+          "tolerance_deg": null,
+          "redness_full_scale_deg": null,
+          "pt_confirmation_required": false
+        }
+      }
+    },
+    "prone_knee_flexion": {
+      "moving_joint": "knee",
+      "testing_position": "prone",
+      "approval": {
+        "approved": false,
+        "approved_by": null,
+        "approved_at": null,
+        "approved_config_sha256": null
+      },
+      "moving_joint_protocol": {
+        "range_min_deg": null,
+        "range_max_deg": null,
+        "target_deg": null,
+        "target_tolerance_deg": null,
+        "redness_full_scale_deg": null
+      },
+      "repetition": {
+        "start_threshold_deg": null,
+        "return_threshold_deg": null,
+        "minimum_duration_seconds": null,
+        "required_hold_seconds": null
+      },
+      "assessment": {
+        "reference_override_deg": null,
+        "wnl_tolerance_deg": null,
+        "slr_expected_arom_deg": null
+      },
+      "supporting_joints": {
+        "hip": {
+          "enabled": true,
+          "target_deg": 0,
+          "tolerance_deg": null,
+          "redness_full_scale_deg": null,
+          "pt_confirmation_required": true
+        },
+        "ankle": {
+          "enabled": true,
+          "target_deg": null,
+          "tolerance_deg": null,
+          "redness_full_scale_deg": null,
+          "pt_confirmation_required": false
+        }
+      }
+    }
+  }
+}

@@ -170,7 +170,7 @@ export class TwinAvatar {
         if (!o.geometry || !o.material) return;
         if (o.isMesh) this.triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
         const prepare = (m) => {
-          m.clippingPlanes = design === "component" ? this.planes : null;
+          m.clippingPlanes = design === "component" ? this.planes : design === "asset" ? this.legClipPlanes() : null;
           m.clipIntersection = false;
           m.needsUpdate = true;
           return m;
@@ -275,6 +275,36 @@ export class TwinAvatar {
     this.status = status;
     this.hipMotion = exercise.hip_motion;
   }
+  legClipPlanes() {
+    if (!this.legPlanes) this.legPlanes = [
+      new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    ];
+    return this.legPlanes;
+  }
+
+  // Design B: same rig and model as Design C, but only the affected leg is drawn.
+  updateLegClip() {
+    const own = this.bones[this.side]?.hip;
+    const other = this.bones[this.side === "left" ? "right" : "left"]?.hip;
+    if (!own || !other) return;
+    const a = own.getWorldPosition(new THREE.Vector3());
+    const b = other.getWorldPosition(new THREE.Vector3());
+    const lateral = a.clone().sub(b);
+    if (lateral.lengthSq() < 1e-8) return;
+    lateral.normalize();
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    const up = new THREE.Vector3(0, 1, 0)
+      .applyQuaternion(this.postureGroup.getWorldQuaternion(new THREE.Quaternion()));
+    const midMargin = this.spec.leg_midline_margin_m ?? 0.01;
+    const topMargin = this.spec.leg_top_margin_m ?? 0.10;
+    const [side, top] = this.legClipPlanes();
+    side.normal.copy(lateral);
+    side.constant = midMargin - lateral.dot(mid);
+    top.normal.copy(up).negate();
+    top.constant = up.dot(a) + topMargin;
+  }
+
   frameCamera(dt) {
     if (!this.root?.visible) return;
     const center = new THREE.Vector3();
@@ -288,6 +318,7 @@ export class TwinAvatar {
       // outside the selected joint region without deleting bones or weights.
       for (const plane of this.planes) plane.constant = radius - plane.normal.dot(center);
     } else if (this.design === "asset") {
+ this.updateLegClip();
       const points = ROLES.map((r) => this.bones[this.side]?.[r]?.getWorldPosition(new THREE.Vector3())).filter(Boolean);
       const box = new THREE.Box3().setFromPoints(points);
       if (box.isEmpty()) box.copy(this.restBox);

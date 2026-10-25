@@ -1,0 +1,9 @@
+# Component Twin exercise station (Ubuntu Mini PC)
+# mediapipe 1.x installs opencv-contrib-python; do not also install opencv-python.
+mediapipe==1.1.1
+numpy>=1.26,<3
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic-settings==2.7.0
+pytest==8.3.4

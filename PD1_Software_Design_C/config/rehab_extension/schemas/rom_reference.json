@@ -1,0 +1,155 @@
+{
+  "type": "object",
+  "properties": {
+    "config_version": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "verification_status": {
+      "type": "string"
+    },
+    "reference_edition": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "movements": {
+      "type": "object",
+      "properties": {
+        "hip_flexion": {
+          "type": "object",
+          "properties": {
+            "neutral_deg": {
+              "type": "number"
+            },
+            "reference_peak_deg": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "neutral_deg",
+            "reference_peak_deg"
+          ],
+          "additionalProperties": false
+        },
+        "knee_flexion": {
+          "type": "object",
+          "properties": {
+            "neutral_deg": {
+              "type": "number"
+            },
+            "reference_peak_deg": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "neutral_deg",
+            "reference_peak_deg"
+          ],
+          "additionalProperties": false
+        },
+        "knee_extension": {
+          "type": "object",
+          "properties": {
+            "neutral_deg": {
+              "type": "number"
+            },
+            "reference_peak_deg": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "neutral_deg",
+            "reference_peak_deg"
+          ],
+          "additionalProperties": false
+        },
+        "ankle_dorsiflexion": {
+          "type": "object",
+          "properties": {
+            "neutral_deg": {
+              "type": "number"
+            },
+            "reference_peak_deg": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "neutral_deg",
+            "reference_peak_deg"
+          ],
+          "additionalProperties": false
+        },
+        "ankle_plantarflexion": {
+          "type": "object",
+          "properties": {
+            "neutral_deg": {
+              "type": "number"
+            },
+            "reference_peak_magnitude_deg": {
+              "type": "number"
+            },
+            "signed_direction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "neutral_deg",
+            "reference_peak_magnitude_deg",
+            "signed_direction"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "hip_flexion",
+        "knee_flexion",
+        "knee_extension",
+        "ankle_dorsiflexion",
+        "ankle_plantarflexion"
+      ],
+      "additionalProperties": false
+    },
+    "measurement_requirements": {
+      "type": "object",
+      "properties": {
+        "store_knee_position_with_ankle_measurements": {
+          "type": "boolean"
+        },
+        "slr_uses_pt_expected_arom_not_120_deg": {
+          "type": "boolean"
+        },
+        "prone_135_is_not_a_required_exercise_endpoint": {
+          "type": "boolean"
+        },
+        "allow_patient_specific_reference_override": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "store_knee_position_with_ankle_measurements",
+        "slr_uses_pt_expected_arom_not_120_deg",
+        "prone_135_is_not_a_required_exercise_endpoint",
+        "allow_patient_specific_reference_override"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "config_version",
+    "label",
+    "verification_status",
+    "reference_edition",
+    "purpose",
+    "movements",
+    "measurement_requirements"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
