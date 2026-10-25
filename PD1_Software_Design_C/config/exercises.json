@@ -26,7 +26,7 @@
         0,
         80
       ],
-      "rest_max_deg": 15,
+      "rest_max_deg": 12,
       "rep_start_deg": 25,
       "incomplete_below_deg": 40,
       "max_speed_dps": 220,
@@ -111,8 +111,8 @@
         0,
         40
       ],
-      "rest_max_deg": 8,
-      "rep_start_deg": 15,
+      "rest_max_deg": 6,
+      "rep_start_deg": 18,
       "incomplete_below_deg": 20,
       "max_speed_dps": 200,
       "required_joints": [
@@ -151,7 +151,7 @@
         0,
         135
       ],
-      "rest_max_deg": 20,
+      "rest_max_deg": 16,
       "rep_start_deg": 30,
       "incomplete_below_deg": 65,
       "max_speed_dps": 180,
