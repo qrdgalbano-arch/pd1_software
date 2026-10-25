@@ -1,4 +1,1 @@
-{
-  "tests/test_component_twin.py::test_prone_leg_flexion_uses_knee_as_primary_joint": true,
-  "tests/test_component_twin.py::test_backend_exercise_names_map_to_station_keys": true
-}
+{}
