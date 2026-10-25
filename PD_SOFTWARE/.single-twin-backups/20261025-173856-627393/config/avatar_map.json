@@ -1,0 +1,23 @@
+{
+  "model_url": "/avatar/Design%20A/scene.gltf",
+  "model_yaw_deg": 0,
+  "bones": {
+    "left": {
+      "hip": "lThigh_0100",
+      "knee": "lShin_0101",
+      "ankle": "lFoot_0102"
+    },
+    "right": {
+      "hip": "rThigh_083",
+      "knee": "rShin_084",
+      "ankle": "rFoot_085"
+    }
+  },
+  "sign": {
+    "hip_flexion": 1,
+    "hip_abduction": 1,
+    "hip_extension": 1,
+    "knee_flexion": 1,
+    "ankle_dorsiflexion": 1
+  }
+}
