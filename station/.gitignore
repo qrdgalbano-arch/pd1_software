@@ -1,9 +1,0 @@
-.env
-.venv/
-data/
-models/*.task
-avatar/*
-!avatar/README.txt
-web/vendor/
-__pycache__/
-.pytest_cache/
