@@ -5,12 +5,12 @@
       "moving_joint": "ankle",
       "testing_position": "supported lying",
       "approval": {"approved": false, "approved_by": null, "approved_at": null, "approved_config_sha256": null},
-      "moving_joint_protocol": {"range_min_deg": null, "range_max_deg": null, "target_deg": null, "target_tolerance_deg": null, "redness_full_scale_deg": null},
-      "repetition": {"start_threshold_deg": null, "return_threshold_deg": null, "minimum_duration_seconds": null, "required_hold_seconds": null},
-      "assessment": {"reference_override_deg": null, "wnl_tolerance_deg": null, "slr_expected_arom_deg": null, "directional_expected_arom_deg": {"dorsiflexion": null, "plantarflexion": null}},
+      "moving_joint_protocol": {"range_min_deg": -30, "range_max_deg": 20, "target_deg": null, "target_tolerance_deg": null, "redness_full_scale_deg": 20},
+      "repetition": {"start_threshold_deg": 5, "return_threshold_deg": 2, "minimum_duration_seconds": null, "required_hold_seconds": null},
+      "assessment": {"reference_override_deg": null, "wnl_tolerance_deg": 0, "slr_expected_arom_deg": null, "directional_expected_arom_deg": {"dorsiflexion": 10, "plantarflexion": 20}},
       "supporting_joints": {
-        "hip": {"enabled": true, "target_deg": null, "tolerance_deg": null, "redness_full_scale_deg": null, "pt_confirmation_required": false},
-        "knee": {"enabled": true, "target_deg": 0, "tolerance_deg": null, "redness_full_scale_deg": null, "pt_confirmation_required": false}
+        "hip": {"enabled": true, "target_deg": 0, "tolerance_deg": 10, "redness_full_scale_deg": 20, "pt_confirmation_required": false},
+        "knee": {"enabled": true, "target_deg": 0, "tolerance_deg": 10, "redness_full_scale_deg": 20, "pt_confirmation_required": false}
       },
       "directional_endpoints_deg": {"dorsiflexion": 20, "plantarflexion_magnitude": 50},
       "assess_directions_separately": true
@@ -19,11 +19,11 @@
       "moving_joint": "hip",
       "testing_position": "supine with exercised knee extended",
       "approval": {"approved": false, "approved_by": null, "approved_at": null, "approved_config_sha256": null},
-      "moving_joint_protocol": {"range_min_deg": null, "range_max_deg": null, "target_deg": null, "target_tolerance_deg": null, "redness_full_scale_deg": null},
-      "repetition": {"start_threshold_deg": null, "return_threshold_deg": null, "minimum_duration_seconds": null, "required_hold_seconds": null},
-      "assessment": {"reference_override_deg": null, "wnl_tolerance_deg": null, "slr_expected_arom_deg": null},
+      "moving_joint_protocol": {"range_min_deg": 0, "range_max_deg": 60, "target_deg": 30, "target_tolerance_deg": null, "redness_full_scale_deg": 20},
+      "repetition": {"start_threshold_deg": 10, "return_threshold_deg": 5, "minimum_duration_seconds": null, "required_hold_seconds": null},
+      "assessment": {"reference_override_deg": null, "wnl_tolerance_deg": 0, "slr_expected_arom_deg": 30},
       "supporting_joints": {
-        "knee": {"enabled": true, "target_deg": 0, "tolerance_deg": null, "redness_full_scale_deg": null, "pt_confirmation_required": false},
+        "knee": {"enabled": true, "target_deg": 0, "tolerance_deg": 10, "redness_full_scale_deg": 20, "pt_confirmation_required": false},
         "ankle": {"enabled": false, "target_deg": 0, "tolerance_deg": null, "redness_full_scale_deg": null, "pt_confirmation_required": false}
       }
     },
@@ -31,9 +31,9 @@
       "moving_joint": "knee",
       "testing_position": "prone",
       "approval": {"approved": false, "approved_by": null, "approved_at": null, "approved_config_sha256": null},
-      "moving_joint_protocol": {"range_min_deg": null, "range_max_deg": null, "target_deg": null, "target_tolerance_deg": null, "redness_full_scale_deg": null},
-      "repetition": {"start_threshold_deg": null, "return_threshold_deg": null, "minimum_duration_seconds": null, "required_hold_seconds": null},
-      "assessment": {"reference_override_deg": null, "wnl_tolerance_deg": null, "expected_arom_deg": null},
+      "moving_joint_protocol": {"range_min_deg": 0, "range_max_deg": 120, "target_deg": 60, "target_tolerance_deg": null, "redness_full_scale_deg": 20},
+      "repetition": {"start_threshold_deg": 15, "return_threshold_deg": 8, "minimum_duration_seconds": null, "required_hold_seconds": null},
+      "assessment": {"reference_override_deg": null, "wnl_tolerance_deg": 0, "expected_arom_deg": 60},
       "supporting_joints": {}
     }
   }
