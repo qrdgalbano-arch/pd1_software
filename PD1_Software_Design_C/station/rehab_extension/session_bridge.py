@@ -52,13 +52,16 @@ def _stats(average, peak):
 
 
 def _range_text(average, expected, tolerance):
-    """WNL comes only from PT-set values: lower limit = expected - tolerance."""
+    """AROM class comes only from PT-set values: lower limit = expected - tolerance."""
     if not (finite(expected) and finite(tolerance) and tolerance >= 0):
         return "PT range not set"
     lower = expected - tolerance
     if not finite(average):
         return f"Not assessed (PT range: {lower:.0f}° or more)"
-    label = "Within Normal Limits" if average >= lower else "Below PT range"
+    label = (
+        "Within Normal Limits" if average >= lower
+        else "Decreased Range of Motion"
+    )
     return f"{label} (PT range: {lower:.0f}° or more)"
 
 
@@ -282,10 +285,33 @@ class Attempt:
                 tracking_valid=rep["tracking_valid"],
             )
 
-    def finish(self, reason):
+    def finish(self, reason, legacy=None):
         reps = self.ev.reps
-        peaks = [r["peak"] for r in reps if r["tracking_valid"]]
         moving = self.ev.primary
+        peaks = [r["peak"] for r in reps if r["tracking_valid"]]
+
+        # The station's own tracker counts valid repetitions reliably, so its
+        # per-repetition peaks feed the report when it recorded any.
+        legacy_peaks = []
+        if legacy and moving != "ankle":
+            legacy_peaks = [
+                r["peak_deg"] for r in (legacy.get("repetitions") or [])
+                if r.get("result") == "valid" and finite(r.get("peak_deg"))
+            ]
+        if legacy_peaks:
+            peaks = legacy_peaks
+            if not reps:
+                for index, peak in enumerate(legacy_peaks, start=1):
+                    try:
+                        self.store.add_rep(
+                            self.id, index, peak,
+                            supporting_joint_angles={},
+                            target_reached=None,
+                            tracking_valid=True,
+                        )
+                    except Exception:
+                        log.exception("Could not record station repetition")
+
         assess_cfg = self.cfg["assessment"]
         tolerance = assess_cfg.get("wnl_tolerance_deg")
 
@@ -313,7 +339,7 @@ class Attempt:
         else:
             stats = compare_sessions(peaks, previous)
 
-        # The range label is judged on the session average of valid peaks.
+        # The AROM class is judged on the session average of valid peaks.
         assessment = assess_arom(
             stats["avg_peak_arom"] if moving != "ankle" else None,
             reference,
@@ -351,7 +377,7 @@ class Attempt:
             "mode": "Unapproved extension preview",
             "rep_boundary_source": "extension_configured_thresholds",
             "legacy_session_end_reason": reason,
-            "reps_completed": len(reps),
+            "reps_completed": len(legacy_peaks) if legacy_peaks else len(reps),
             "unfinished_rep": self.ev.active is not None,
             "target_reached_count": 0,
             "target_not_reached_count": 0,
@@ -456,7 +482,7 @@ def install(cls):
         result = original_finish(self, t, reason)
         if result is not None and attempt:
             try:
-                self._rehab_summary = attempt.finish(reason)
+                self._rehab_summary = attempt.finish(reason, result)
             except Exception as exc:
                 self._rehab_recording_error = str(exc)
                 log.exception("Extension summary could not be saved")
