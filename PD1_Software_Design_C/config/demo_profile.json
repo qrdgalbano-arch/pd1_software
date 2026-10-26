@@ -1,0 +1,76 @@
+{
+  "notice": "SYNTHETIC DEMO PRESETS. NOT PT APPROVAL OR CLINICAL THRESHOLDS.",
+  "version": "isolated-demo-1",
+  "visibility": 0.5,
+  "smoothing_alpha": 0.35,
+  "repetitions": 5,
+  "duration_seconds": 120,
+  "feedback_hold_seconds": 2.5,
+  "maximum_sample_gap_seconds": 0.25,
+  "trend_sessions": 5,
+  "support_tolerance_deg": 10,
+  "redness_full_scale_deg": 20,
+  "exercises": {
+    "ankle_pumps": {
+      "name": "Lying ankle pumps",
+      "moving": "ankle",
+      "start": 5,
+      "rest": 2,
+      "targets": {
+        "positive": 10,
+        "negative": 20
+      },
+      "reference": {
+        "positive": 20,
+        "negative": 50
+      },
+      "range": [
+        -30,
+        20
+      ],
+      "support": {
+        "hip": 0,
+        "knee": 0
+      }
+    },
+    "straight_leg_raise": {
+      "name": "Supine straight-leg raise",
+      "moving": "hip",
+      "start": 10,
+      "rest": 5,
+      "targets": {
+        "positive": 30
+      },
+      "reference": {
+        "positive": 30
+      },
+      "range": [
+        0,
+        60
+      ],
+      "support": {
+        "knee": 0,
+        "ankle": 0
+      }
+    },
+    "prone_knee_flexion": {
+      "name": "Prone knee flexion",
+      "moving": "knee",
+      "start": 15,
+      "rest": 8,
+      "targets": {
+        "positive": 60
+      },
+      "reference": {
+        "positive": 135
+      },
+      "range": [
+        0,
+        120
+      ],
+      "support": {
+        "hip": 0
+      }
+    }
+  }
+}

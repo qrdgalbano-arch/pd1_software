@@ -1,4 +1,4 @@
-# QMMC PD1 Proof of Concept
+﻿# QMMC PD1 Proof of Concept
 
 ## Project Description
 
@@ -41,8 +41,6 @@ The final pose-estimation component may be integrated in a later development pha
 - SQLAlchemy and Alembic
 - Bootstrap 5
 - Chart.js
-- Docker and Docker Compose
-- Nginx
 - Git and GitHub
 
 ## Development Approach
@@ -73,5 +71,7 @@ qrdgalbano-arch/qmmc_pd1_poc
 ## Validation and Deployment
 
 - See [TESTING.md](TESTING.md) for automated backend tests, Flutter checks, runtime smoke tests, and POC test limitations.
-- See [DEPLOYMENT.md](DEPLOYMENT.md) for production-environment setup, Docker Compose deployment, backups, rollback, HTTPS requirements, Android signing, and deployment limitations.
-- Use `docker-compose.production.yml` only with a private, untracked `.env.production` created from `.env.production.example`.
+- See [DEPLOYMENT.md](DEPLOYMENT.md) for native Windows setup, running the app, backups, rollback, HTTPS requirements, Android signing, and deployment limitations.
+- Quick start: run `.\scripts\setup.ps1` once, then `.\scripts\run.ps1`. The app runs as a single FastAPI process at `http://localhost:8000`.
+
+
