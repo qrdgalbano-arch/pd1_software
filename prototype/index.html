@@ -1,30 +1,32 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rehab Station - Design C Prototype</title><link rel="stylesheet" href="style.css">
+<title>QMMC Rehab Station</title><link rel="stylesheet" href="style.css">
 <script type="importmap">{"imports":{"three":"../PD1_Software_Design_C/web/vendor/three/build/three.module.js"}}</script></head>
 <body>
-<header><b>QMMC Rehab Station</b><span id="who"></span></header>
+<header><div class="brand"><div class="logo">R</div>QMMC Rehab Station</div><span id="who"></span></header>
 
-<section id="login" class="screen"><h2>Enter Patient ID</h2>
-<input id="pid" inputmode="numeric" maxlength="7" placeholder="7-digit ID"><button id="pidGo">Continue</button><p id="pidErr" class="err"></p></section>
+<section id="login" class="screen"><div class="card login"><h2>Welcome</h2><p class="sub">Enter your 7-digit Patient ID</p>
+<input id="pid" inputmode="numeric" maxlength="7" placeholder="_ _ _ _ _ _ _" autocomplete="off">
+<div class="keypad"><button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button><button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button><button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button><button class="key" data-k="del">&larr;</button><button class="key" data-k="0">0</button><button class="key" data-k="clr">C</button></div>
+<button id="pidGo" style="width:100%">Continue</button><p id="pidErr" class="err"></p></div></section>
 
-<section id="list" class="screen hidden"><div class="card"><h3>EXERCISES TODAY</h3><div id="today"></div></div><div id="exList"></div>
-<button id="finishAll" class="secondary">View session summary</button></section>
+<section id="list" class="screen hidden"><div class="card today"><div><small class="tag">EXERCISES TODAY</small><br><b id="today"></b></div><button id="finishAll" class="secondary">Session summary</button></div><div id="exList"></div></section>
 
 <section id="detail" class="screen hidden"><h2 id="dName"></h2>
 <div class="row"><div class="chip"><small>PRESCRIPTION</small><b id="dRx"></b></div><div class="chip"><small>FREQUENCY</small><b id="dFreq"></b></div></div>
-<div class="card"><b>Instructions</b><ol id="dIns"></ol><p id="dCam"></p></div>
-<div class="video">[Video Demo]</div><button id="startSession">Start Session</button> <button id="backList" class="secondary">Back</button></section>
+<div class="card"><h3>Instructions</h3><ol id="dIns"></ol><p id="dCam" class="tag"></p></div>
+<div class="video">[ Video Demo ]</div><button id="startSession">Start Session</button> <button id="backList" class="secondary">Back</button></section>
 
 <section id="record" class="screen hidden">
-<div class="bar"><span id="rTitle"></span><span id="rInfo"></span></div>
-<div class="grid"><div class="cam"><video id="vid" playsinline muted></video><canvas id="ov"></canvas></div>
-<div><div class="twin"><canvas id="twin3d" width="420" height="300"></canvas><canvas id="twin" width="420" height="300"></canvas></div><small>Digital twin: solid = you, faded blue = target</small></div></div>
-<div id="msg" class="msg">Starting camera...</div>
+<div class="topbar"><h2 id="rTitle"></h2><div class="chips"><span class="cp" id="cSet"></span><span class="cp" id="cLeg"></span><span class="cp amber" id="cPhase"></span></div></div>
+<div class="grid">
+<div class="panel"><div class="ph"><span>Camera</span></div><div class="cam"><video id="vid" playsinline muted></video><canvas id="ov"></canvas></div></div>
+<div class="panel"><div class="ph"><span>Digital twin</span><span class="tag" id="twinNote">target (amber) / you</span></div><div class="twin"><canvas id="twin3d" width="420" height="300"></canvas><canvas id="twin" width="420" height="300"></canvas></div></div>
+</div>
+<div class="msgrow"><div id="msg" class="msg">Starting camera...</div><div class="bigrep"><small>VALID REPS</small><b id="bigRep">0/0</b></div></div>
 <div id="stat" class="stat"></div>
-<div class="stat"><label>Pose view rotation: <select id="rotSel"><option value="auto">Auto</option><option value="0">0 deg</option><option value="90">90 deg (clockwise)</option><option value="-90">-90 deg (counter-clockwise)</option></select></label> <small>If the dots are not on your body, change this.</small></div>
 <div id="rest" class="hidden card"><h3>Rest</h3><div id="restClock" class="clock"></div><button id="extend">Extend rest (+1 min)</button></div>
-<button id="stopRec" class="secondary">Stop session</button></section>
+<div class="tools"><label class="tag">Pose view rotation: <select id="rotSel"><option value="auto">Auto</option><option value="0">0 deg</option><option value="90">90 deg (clockwise)</option><option value="-90">-90 deg (counter-clockwise)</option></select></label><button id="stopRec" class="secondary">Stop session</button></div></section>
 
 <section id="summary" class="screen hidden"><h2>Session Summary</h2><div id="sumBody"></div>
 <button id="dl" class="secondary">Download JSON</button> <button id="toList">Back to exercises</button></section>
