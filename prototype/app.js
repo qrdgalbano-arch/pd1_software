@@ -17,7 +17,6 @@ function show(id) { document.querySelectorAll(".screen").forEach((e) => e.classL
 function modal(html, bind) { $("#modalBox").innerHTML = html; $("#modal").classList.remove("hidden"); bind && bind(); }
 function closeModal() { $("#modal").classList.add("hidden"); }
 
-/* ---------- audio ---------- */
 let actx;
 function beep() { try { actx = actx || new AudioContext(); const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; g.gain.value = 0.15; o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.15); } catch {} }
 let lastSpoken = { t: 0, m: "" };
@@ -32,7 +31,6 @@ function say(m, force) {
   if (v) u.voice = v; speechSynthesis.speak(u);
 }
 
-/* ---------- login & list ---------- */
 $("#who").textContent = `${C.patient.name} | ${C.patient.sex} | ${C.patient.age} y`;
 $("#pidGo").onclick = () => {
   const v = $("#pid").value.trim();
@@ -77,7 +75,6 @@ $("#backList").onclick = () => { renderList(); show("list"); };
 $("#finishAll").onclick = () => { renderSummary(); show("summary"); };
 $("#toList").onclick = () => { renderList(); show("list"); };
 
-/* ---------- pose estimation (full body, rotation for lying poses) ---------- */
 async function initPose() {
   if (app.landmarker) return;
   const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
@@ -100,7 +97,6 @@ function runDetect(v, rot) {
   const raw = r.landmarks && r.landmarks[0]; if (!raw) return null;
   return raw.map((p) => rot === 0 ? { x: p.x, y: p.y, visibility: p.visibility ?? 0 } : rot === 90 ? { x: p.y, y: 1 - p.x, visibility: p.visibility ?? 0 } : { x: 1 - p.y, y: p.x, visibility: p.visibility ?? 0 });
 }
-// A confident skeleton is only trusted if the trunk lies roughly horizontal in the camera image (patient is lying, camera at the side).
 function score(lm, W, H) {
   if (!lm) return 0;
   const v = KEYS.reduce((s, i) => s + lm[i].visibility, 0) / KEYS.length;
@@ -124,7 +120,6 @@ function detect(v) {
 }
 function smoothLm(prev, lm) { return prev ? lm.map((p, i) => ({ x: prev[i].x + 0.5 * (p.x - prev[i].x), y: prev[i].y + 0.5 * (p.y - prev[i].y), visibility: p.visibility })) : lm.map((p) => ({ ...p })); }
 
-/* ---------- geometry ---------- */
 function ang(a, b, c) {
   const v1 = [a.x - b.x, a.y - b.y], v2 = [c.x - b.x, c.y - b.y];
   const m = Math.hypot(...v1) * Math.hypot(...v2); if (!m) return 180;
@@ -149,7 +144,6 @@ function avatarDirs(lm, W, H, prone, headDir) {
   return d;
 }
 
-/* ---------- session ---------- */
 async function initAvatar(exId) {
   try {
     if (!app.av) { setMsg("Loading 3D avatar (large file, please wait)..."); app.av = await createAvatar($("#twin3d")); }
@@ -159,6 +153,7 @@ async function initAvatar(exId) {
 }
 $("#rotSel").value = app.rotMode;
 $("#rotSel").onchange = (e) => { app.rotMode = e.target.value; localStorage.setItem("rotMode", app.rotMode); if (app.S) app.S.lmS = null; };
+const newProbe = () => ({ leg: null, moving: false, peak: 0, viol: null, devT: {}, prevA: null, prevT: 0, recs: [] });
 $("#startSession").onclick = async () => {
   show("record"); $("#msg").textContent = "Starting camera..."; $("#msg").className = "msg";
   try {
@@ -169,7 +164,7 @@ $("#startSession").onclick = async () => {
   } catch (err) { $("#msg").textContent = "Camera/model error: " + err.message + " (serve over http://localhost)"; return; }
   const ex = C.exercises[app.ex];
   await initAvatar(ex.id);
-  app.S = { ex, set: 1, leg: null, legsDone: [], reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], resume: 0, prevA: null, prevT: 0, lmS: null, M: null, m: null, running: true, guide: {}, nvis: 0, sv: { left: 0, right: 0 } };
+  app.S = { ex, set: 1, leg: null, legsDone: [], reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], prevA: null, prevT: 0, lmS: null, M: null, m: null, running: true, guide: {}, nvis: 0, sv: { left: 0, right: 0 }, rp: newProbe() };
   $("#rTitle").textContent = ex.name; setMsg("Get into the position shown by the green target.");
   say(`Get into position like the green target. ${ex.id === "slr" ? "Lie on your back" : "Lie on your stomach"}.`, true);
   requestAnimationFrame(loop);
@@ -188,12 +183,13 @@ function loop() {
     if (lm) {
       S.lmS = smoothLm(S.lmS, lm); S.nvis = S.lmS.filter((p) => p.visibility >= 0.5).length;
       ingest(W, H);
-      if (S.phase === "REST") restTick(); else if (S.allVisible) process(W, H);
-      else if (S.phase !== "REST") { setMsg(S.visMsg, "bad"); say(S.visMsg); }
+      if (S.phase === "REST") { restTick(); if (S.phase === "REST" && S.allVisible) restProbe(); }
+      else if (S.allVisible) process(W, H);
+      else { setMsg(S.visMsg, "bad"); say(S.visMsg); }
     } else { S.lmS = null; S.allVisible = false; S.nvis = 0; if (S.phase === "REST") restTick(); else setMsg("I can't see you. Lie in view of the camera.", "bad"); }
     draw(ov, W, H);
     $("#rInfo").textContent = `Set ${S.set}/${C.sets} | ${S.leg ? S.leg + " leg" : "choose a leg"} | Valid ${S.reps}/${C.repsPerSet}`;
-    $("#stat").textContent = `Landmarks ${S.nvis}/33 | rotation ${app.rot} deg (${app.rotMode})` + (S.resume ? ` | Resuming: ${C.resumeValidReps - S.resume}/${C.resumeValidReps} valid reps` : "");
+    $("#stat").textContent = `Landmarks ${S.nvis}/33 | rotation ${app.rot} deg (${app.rotMode})`;
   }
   requestAnimationFrame(loop);
 }
@@ -203,7 +199,6 @@ function ingest(W, H) {
   S.M = { left: sideMetrics(lm, "left", W, H), right: sideMetrics(lm, "right", W, H) };
   const sv = (side) => Math.min(...SIDE[side].map((i) => lm[i].visibility));
   S.sv = { left: sv("left"), right: sv("right") };
-  // Side-view rule: the camera-side leg must be clear; the far-side leg may be partly hidden.
   const best = S.sv.left >= S.sv.right ? "left" : "right", far = other(best);
   S.allVisible = S.sv[best] >= C.minVisibility && S.sv[far] >= 0.15;
   if (!S.allVisible) {
@@ -234,6 +229,20 @@ function positionFailures(ex, S) {
   } else if (ex.id === "slr") { if (!ok("left") && !ok("right")) f.push({ id: "low", t: "Lower and straighten one leg on the mat.", dir: "down", j: "a" }); }
   else if (!ok("left") || !ok("right")) f.push({ id: "str", t: "Lie on your stomach with both legs straight.", dir: "down", j: "a" });
   return f;
+}
+
+function evalDev(ex, m, speed, now, devT) {
+  const dev = [];
+  if (ex.id === "slr" && m.kneeFlex > ex.knee_max_deg) dev.push({ id: "knee", t: "Keep your knee straight.", red: "knee" });
+  if (ex.id === "plf" && m.hipFlex > ex.thigh_max_deg) dev.push({ id: "thigh", t: "Keep your thigh flat on the mat.", red: "thigh" });
+  if (speed > ex.max_speed_dps) dev.push({ id: "fast", t: "Slow down.", red: "leg" });
+  let active = null;
+  for (const d of dev) {
+    devT[d.id] = devT[d.id] || now;
+    if (now - devT[d.id] >= C.deviationConfirmSeconds) active = active || d;
+  }
+  ["knee", "thigh", "fast"].forEach((id) => { if (!dev.find((d) => d.id === id)) delete devT[id]; });
+  return active;
 }
 
 function process(W, H) {
@@ -267,16 +276,8 @@ function process(W, H) {
     S.peak = Math.max(S.peak, a);
     const speed = S.prevA == null ? 0 : Math.abs(a - S.prevA) / Math.max(now - S.prevT, 0.016);
     S.prevA = a; S.prevT = now;
-    const dev = [];
-    if (ex.id === "slr" && m.kneeFlex > ex.knee_max_deg) dev.push({ id: "knee", t: "Keep your knee straight.", red: "knee" });
-    if (ex.id === "plf" && m.hipFlex > ex.thigh_max_deg) dev.push({ id: "thigh", t: "Keep your thigh flat on the mat.", red: "thigh" });
-    if (speed > ex.max_speed_dps) dev.push({ id: "fast", t: "Slow down.", red: "leg" });
-    S.activeDev = null;
-    for (const d of dev) {
-      S.devT[d.id] = S.devT[d.id] || now;
-      if (now - S.devT[d.id] >= C.deviationConfirmSeconds) { S.viol = S.viol || d; S.activeDev = d; }
-    }
-    ["knee", "thigh", "fast"].forEach((id) => { if (!dev.find((d) => d.id === id)) delete S.devT[id]; });
+    S.activeDev = evalDev(ex, m, speed, now, S.devT);
+    if (S.activeDev) S.viol = S.viol || S.activeDev;
     if (S.activeDev) { setMsg(S.activeDev.t, "bad"); say(S.activeDev.t); S.guide = { dir: "down", j: "k", red: S.activeDev.red }; }
     else if (S.peak >= ex.target_deg) { setMsg("Good. Now lower slowly.", "good"); S.guide = { dir: "down", j: "a" }; }
     else { setMsg("Good form. Keep lifting toward the target.", ""); S.guide = { dir: "up", j: "a" }; }
@@ -284,15 +285,13 @@ function process(W, H) {
   }
 }
 
-// A rep counts when the movement cycle is completed with correct form (knee straight / thigh flat / not too fast).
-// The range reached does NOT decide validity; it is recorded for the ROM average and the target-reached count.
 function completeRep(m) {
   const S = app.S, ex = S.ex;
   const valid = !S.viol, reached = S.peak >= ex.target_deg;
   S.data.push({ set: S.set, leg: S.leg, peak: +S.peak.toFixed(1), rom: +(S.peak - Math.min(primary(ex, m), ex.rest_max_deg)).toFixed(1), valid, reachedTarget: reached, reason: valid ? null : S.viol.id });
   S.phase = "READY"; S.hold = null;
   if (valid) {
-    beep(); S.reps++; if (S.resume > 0) S.resume--;
+    beep(); S.reps++;
     setMsg(reached ? `Rep ${S.reps} counted.` : `Rep ${S.reps} counted. Try to lift a little higher next time.`, "good");
     if (S.reps >= C.repsPerSet) return legDone();
   } else { const t = "Not counted. " + S.viol.t; setMsg(t, "bad"); say(t, true); }
@@ -304,14 +303,50 @@ function legDone() {
     S.leg = other(S.leg); S.reps = 0; S.phase = "POSITION"; S.hold = null;
     setMsg(`Leg done. Now your ${S.leg} leg.`, "good"); say(`Leg done. Now your ${S.leg} leg.`, true); return;
   }
-  if (S.set < C.sets) { S.phase = "REST"; S.restEnd = performance.now() / 1000 + C.restSeconds; $("#rest").classList.remove("hidden"); setMsg("Set complete. Rest.", "good"); say("Set complete. Rest.", true); return; }
+  if (S.set < C.sets) {
+    S.phase = "REST"; S.rp = newProbe(); S.restEnd = performance.now() / 1000 + C.restSeconds; $("#rest").classList.remove("hidden");
+    setMsg(`Set complete. Rest, or do ${C.resumeValidReps} valid reps to continue early.`, "good"); say("Set complete. Rest.", true); return;
+  }
   finishRec(true);
+}
+function restProbe() {
+  const S = app.S, ex = S.ex, M = S.M, P = S.rp, now = performance.now() / 1000;
+  if (!P.moving) {
+    const c = ["left", "right"].filter((s) => S.sv[s] >= 0.3 && moving(ex, M[s]));
+    if (!c.length) return;
+    const leg = c.sort((a, b) => primary(ex, M[b]) - primary(ex, M[a]))[0];
+    if (P.leg && P.leg !== leg) P.recs = [];
+    P.leg = leg; P.moving = true; P.peak = primary(ex, M[leg]); P.viol = null; P.devT = {}; P.prevA = P.peak; P.prevT = now;
+    return;
+  }
+  const m = M[P.leg], a = primary(ex, m);
+  P.peak = Math.max(P.peak, a);
+  const speed = P.prevA == null ? 0 : Math.abs(a - P.prevA) / Math.max(now - P.prevT, 0.016);
+  P.prevA = a; P.prevT = now;
+  const act = evalDev(ex, m, speed, now, P.devT);
+  if (act) P.viol = P.viol || act;
+  if (a < ex.rest_max_deg) {
+    P.moving = false;
+    if (P.viol) { setMsg(`Not counted. ${P.viol.t}`, "bad"); return; }
+    P.recs.push({ leg: P.leg, peak: +P.peak.toFixed(1), rom: +(P.peak - Math.min(a, ex.rest_max_deg)).toFixed(1), valid: true, reachedTarget: P.peak >= ex.target_deg, reason: null });
+    beep(); setMsg(`Rest: valid rep ${P.recs.length}/${C.resumeValidReps}`, "good");
+    if (P.recs.length >= C.resumeValidReps) endRestEarly();
+  }
+}
+function endRestEarly() {
+  const S = app.S, P = S.rp;
+  $("#rest").classList.add("hidden");
+  S.set++; S.leg = P.leg; S.legsDone = [];
+  P.recs.forEach((r) => S.data.push({ set: S.set, ...r }));
+  S.reps = P.recs.length; S.phase = "READY"; S.hold = null; S.sm = null;
+  setMsg(`Rest stopped. Continue set ${S.set} with your ${S.leg} leg.`, "good"); say(`Rest stopped. Continue your set.`, true);
+  if (S.reps >= C.repsPerSet) legDone();
 }
 function restTick() {
   const S = app.S, left = Math.ceil(S.restEnd - performance.now() / 1000);
   $("#restClock").textContent = `${String(Math.floor(Math.max(left, 0) / 60)).padStart(2, "0")}:${String(Math.max(left, 0) % 60).padStart(2, "0")}`;
   if (left <= 0) {
-    $("#rest").classList.add("hidden"); S.set++; S.leg = null; S.legsDone = []; S.reps = 0; S.phase = "POSITION"; S.hold = null; S.resume = C.resumeValidReps;
+    $("#rest").classList.add("hidden"); S.set++; S.leg = null; S.legsDone = []; S.reps = 0; S.phase = "POSITION"; S.hold = null;
     setMsg(`Rest finished. Get ready for set ${S.set}.`); say(`Rest finished. Set ${S.set}. Get into position.`, true);
   }
 }
@@ -326,7 +361,6 @@ function finishRec(complete) {
   renderSummary(); show("summary"); if (complete) say("Exercise complete.", true);
 }
 
-/* ---------- summary ---------- */
 function stats(ex, rows) {
   const v = rows.filter((r) => r.valid); if (!v.length) return null;
   const avg = (k) => v.reduce((s, r) => s + r[k], 0) / v.length;
@@ -335,11 +369,12 @@ function stats(ex, rows) {
 function renderSummary() {
   let h = `<p>Patient ID ${app.pid || "-"} | ${C.patient.name}, ${C.patient.sex}, ${C.patient.age}</p>`;
   Object.values(app.results).forEach((r) => {
-    h += `<h3>${r.ex.name} (${r.ex.motion})</h3><p class="tag">Standard: ${r.ex.wnl_source}. WNL if average valid-rep ROM >= ${r.ex.wnl_min_deg} deg. Exercise target per rep: ${r.ex.target_deg} deg.</p>
+    const off = r.ex.display_offset_deg || 0, limit = r.ex.wnl_min_deg + off;
+    h += `<h3>${r.ex.name} (${r.ex.motion})</h3><p class="tag">Standard: ${r.ex.wnl_source}. WNL if average valid-rep ROM >= ${limit} deg. Exercise target per rep: ${r.ex.target_deg} deg.</p>
     <table><tr><th>Leg</th><th>Valid reps</th><th>Reached exercise target</th><th>Not counted (form)</th><th>Avg ROM (valid)</th><th>Classification</th></tr>`;
     C.legs.forEach((leg) => {
       const s = stats(r.ex, r.data.filter((d) => d.leg === leg));
-      h += s ? `<tr><td>${leg}</td><td>${s.n}</td><td>${s.reached}/${s.n}</td><td>${s.bad}</td><td>${s.rom.toFixed(1)} deg</td><td class="${s.wnl ? "wnl" : "low"}">${s.wnl ? "Within normal limits" : "Below normal limits"}</td></tr>`
+      h += s ? `<tr><td>${leg}</td><td>${s.n}</td><td>${s.reached}/${s.n}</td><td>${s.bad}</td><td>${(s.rom + off).toFixed(1)} deg</td><td class="${s.wnl ? "wnl" : "low"}">${s.wnl ? "Within normal limits" : "Below normal limits"}</td></tr>`
              : `<tr><td>${leg}</td><td>0</td><td>-</td><td>-</td><td>n/a</td><td>Not assessed</td></tr>`;
     });
     h += "</table>";
@@ -352,7 +387,6 @@ $("#dl").onclick = () => {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `session_${app.pid}.json`; a.click();
 };
 
-/* ---------- drawing ---------- */
 function arrow(ctx, x, y, dir, len, col) {
   const dy = dir === "up" ? -1 : 1; ctx.strokeStyle = ctx.fillStyle = col; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + dy * len); ctx.stroke();
@@ -381,21 +415,19 @@ function draw(ov, W, H) {
 function drawTwin(W, H) {
   const S = app.S, c = $("#twin"), ctx = c.getContext("2d"), ex = S.ex; ctx.clearRect(0, 0, c.width, c.height);
   const g = S.guide || {}, showLive = S.phase !== "POSITION" && !!S.lmS;
-  const gh = S.phase === "MOVING" || (S.phase === "READY" && S.leg) ? ex.ghost_deg : 0;
-  const ghostLegs = gh && S.leg ? [{ side: S.leg, hip: ex.id === "slr" ? gh : 0, knee: ex.id === "plf" ? gh : 0 }] : [];
   if (app.use3d) {
     try {
       const dirs = showLive ? avatarDirs(S.lmS, W, H, ex.id === "plf", S.headDir) : {};
-      app.av.update({ showLive, dirs, ghostLegs, red: g.red, side: S.leg });
+      app.av.update({ showLive, dirs, red: g.red, side: S.leg });
     } catch (err) { console.warn("3D update failed, switching to 2D twin:", err); app.use3d = false; $("#twin3d").style.display = "none"; }
   }
   if (!app.use3d) {
     const ox = 170, oy = 210, m = S.m || { hipFlex: 0, kneeFlex: 0 };
     ctx.fillStyle = "#cfd8dc"; ctx.fillRect(20, oy + 18, 380, 8);
-    skeleton(ctx, ox, oy, ex, ex.id === "slr" ? gh : 0, ex.id === "plf" ? gh : 0, showLive ? 0.3 : 0.8, showLive ? "#1565c0" : "#2e7d32", null);
     if (showLive) skeleton(ctx, ox, oy, ex, m.hipFlex, m.kneeFlex, 1, "#00796b", g.red);
+    else skeleton(ctx, ox, oy, ex, 0, 0, 0.8, "#2e7d32", null);
   }
-  ctx.fillStyle = "#333"; ctx.font = "bold 14px system-ui"; ctx.fillText(showLive ? "You (solid) / target (faded blue)" : "TARGET POSITION - match this", 10, 20);
+  ctx.fillStyle = "#333"; ctx.font = "bold 14px system-ui"; ctx.fillText(showLive ? "You" : "TARGET POSITION - match this", 10, 20);
   if (g.dir) arrow(ctx, 340, g.dir === "up" ? 190 : 80, g.dir, 60, "#f9a825");
 }
 function skeleton(ctx, ox, oy, ex, hip, knee, alpha, col, red) {
