@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import { createAvatar } from "./avatar3d.js";
 import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
 const $ = (s) => document.querySelector(s);
@@ -7,7 +8,7 @@ const C = { ...CONFIG, repsPerSet: +q.get("reps") || CONFIG.repsPerSet, restSeco
 const MODEL = "../PD1_Software_Design_C/models/pose_landmarker_full.task";
 const SIDE = { left: [11, 23, 25, 27], right: [12, 24, 26, 28] };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const app = { pid: null, done: {}, skipped: {}, results: {}, ex: null, landmarker: null, S: null };
+const app = { pid: null, done: {}, skipped: {}, results: {}, ex: null, landmarker: null, S: null, av: null, use3d: false };
 
 function show(id) { document.querySelectorAll(".screen").forEach((e) => e.classList.add("hidden")); $("#" + id).classList.remove("hidden"); }
 function modal(html, bind) { $("#modalBox").innerHTML = html; $("#modal").classList.remove("hidden"); bind && bind(); }
@@ -92,6 +93,13 @@ async function initPose() {
   const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
   app.landmarker = await PoseLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: MODEL }, runningMode: "VIDEO", numPoses: 1 });
 }
+async function initAvatar(exId) {
+  try {
+    if (!app.av) { setMsg("Loading 3D avatar (large file, please wait)..."); app.av = await createAvatar($("#twin3d"), q.get("flip") === "1" ? -1 : 1); }
+    app.av.setExercise(exId); app.use3d = true;
+  } catch (err) { console.warn("3D avatar unavailable, using 2D twin:", err); app.use3d = false; app.av = null; }
+  $("#twin3d").style.display = app.use3d ? "block" : "none";
+}
 $("#startSession").onclick = async () => {
   show("record"); $("#msg").textContent = "Starting camera..."; $("#msg").className = "msg";
   try {
@@ -100,6 +108,7 @@ $("#startSession").onclick = async () => {
     $("#vid").srcObject = stream; await $("#vid").play();
   } catch (err) { $("#msg").textContent = "Camera/model error: " + err.message + " (serve over http://localhost)"; return; }
   const ex = C.exercises[app.ex];
+  await initAvatar(ex.id);
   app.S = { ex, set: 1, legIdx: 0, reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], resume: 0, prevA: null, prevT: 0, sm: null, lost: false, running: true, guide: {} };
   $("#rTitle").textContent = ex.name; setMsg("Get into the starting position.");
   say(`Get into position. ${ex.id === "slr" ? "Lie on your back" : "Lie on your stomach"}, ${C.legs[0]} leg first.`, true);
@@ -274,13 +283,20 @@ function draw(lm, ov) {
 }
 function drawTwin() {
   const S = app.S, c = $("#twin"), ctx = c.getContext("2d"), ex = S.ex; ctx.clearRect(0, 0, c.width, c.height);
-  const ox = 170, oy = 210;
-  ctx.fillStyle = "#cfd8dc"; ctx.fillRect(20, oy + 18, 380, 8);
-  const gh = S.phase === "MOVING" || S.phase === "READY" ? ex.ghost_deg : 0;
-  skeleton(ctx, ox, oy, ex, ex.id === "slr" ? gh : 0, ex.id === "plf" ? gh : 0, 0.3, "#1565c0", null);
   const m = S.m || { hipFlex: 0, kneeFlex: 0 }, g = S.guide || {};
-  skeleton(ctx, ox, oy, ex, m.hipFlex, m.kneeFlex, 1, "#00796b", g.red);
-  if (g.dir) arrow(ctx, ox + 190, oy - (g.dir === "up" ? 30 : 130), g.dir, 60, "#f9a825");
+  const gh = S.phase === "MOVING" || S.phase === "READY" ? ex.ghost_deg : 0;
+  if (app.use3d) {
+    try {
+      app.av.update({ side: curLeg(), ex: ex.id, hip: m.hipFlex, knee: m.kneeFlex, ghostHip: ex.id === "slr" ? gh : 0, ghostKnee: ex.id === "plf" ? gh : 0, red: g.red });
+    } catch (err) { console.warn("3D update failed, switching to 2D twin:", err); app.use3d = false; $("#twin3d").style.display = "none"; }
+  }
+  if (!app.use3d) {
+    const ox = 170, oy = 210;
+    ctx.fillStyle = "#cfd8dc"; ctx.fillRect(20, oy + 18, 380, 8);
+    skeleton(ctx, ox, oy, ex, ex.id === "slr" ? gh : 0, ex.id === "plf" ? gh : 0, 0.3, "#1565c0", null);
+    skeleton(ctx, ox, oy, ex, m.hipFlex, m.kneeFlex, 1, "#00796b", g.red);
+  }
+  if (g.dir) arrow(ctx, 340, g.dir === "up" ? 190 : 80, g.dir, 60, "#f9a825");
 }
 function skeleton(ctx, ox, oy, ex, hip, knee, alpha, col, red) {
   const T = 120, TH = 110, SH = 105, r = (d) => (d * Math.PI) / 180;
