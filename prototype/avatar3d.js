@@ -7,6 +7,7 @@ const RE = { thigh: /thigh|upleg/, shin: /calf|shin|lowerleg/, foot: /foot/, uar
 const EXCL = /twist|roll|helper|toe|collar|clav|scap|pole|target/;
 const CHILD = { thigh: "shin", shin: "foot", uarm: "farm", farm: "hand" };
 const ORDER = ["thigh", "shin", "uarm", "farm"];
+const COL_TARGET = 0x2e7d4f, COL_GHOST = 0xd7a13a, COL_BED = 0xd8d0b7;
 
 function sideOf(n) {
   n = n.toLowerCase();
@@ -35,26 +36,27 @@ export async function createAvatar(canvas) {
   const buf = await (await fetch(MODEL_URL)).arrayBuffer();
   const loader = new GLTFLoader();
   const parse = () => new Promise((res, rej) => loader.parse(buf.slice(0), "", res, rej));
-  const gLive = await parse(), gTarget = await parse();
+  const gLive = await parse(), gGhost = await parse();
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setSize(420, 300, false);
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.7));
   const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(-2, 3, 2); scene.add(dl);
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 2.4), new THREE.MeshStandardMaterial({ color: 0xcfd8dc }));
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 2.4), new THREE.MeshStandardMaterial({ color: COL_BED }));
   bed.position.set(0, -0.02, 0.1); scene.add(bed);
   const camera = new THREE.PerspectiveCamera(35, 420 / 300, 0.1, 50);
-  let fz = 1;
+  const ghostMats = [];
+  let curEx = "slr", fz = 1;
 
-  function buildRig(gltf, target) {
+  function buildRig(gltf, ghost) {
     const root = gltf.scene, wrap = new THREE.Group(), holder = new THREE.Group();
     wrap.add(root); holder.add(wrap); scene.add(holder);
     root.traverse((o) => {
       if (!(o.isMesh || o.isSkinnedMesh)) return;
       o.frustumCulled = false;
-      if (target) {
-        const f = (m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.85; c.depthWrite = false; if (c.color) c.color.set(0x66bb6a); return c; };
+      if (ghost) {
+        const f = (m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.3; c.depthWrite = false; ghostMats.push(c); return c; };
         o.material = Array.isArray(o.material) ? o.material.map(f) : f(o.material);
       }
     });
@@ -75,13 +77,13 @@ export async function createAvatar(canvas) {
       if (bone && child) items.push({ id: side + "_" + k, side, key: k, bone, child, rest: bone.quaternion.clone() });
     }
     const marks = {};
-    if (!target) for (const k of ["thigh", "shin"]) {
+    if (!ghost) for (const k of ["thigh", "shin"]) {
       const ms = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff1744, transparent: true, opacity: 0.55, depthTest: false }));
       ms.visible = false; ms.renderOrder = 10; marks[k] = ms; scene.add(ms);
     }
     return { holder, bones: b, items, marks };
   }
-  const live = buildRig(gLive, false), target = buildRig(gTarget, true);
+  const live = buildRig(gLive, false), ghost = buildRig(gGhost, true);
   window.__avatarBones = live.bones.names;
 
   const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
@@ -97,9 +99,14 @@ export async function createAvatar(canvas) {
       rig.holder.updateMatrixWorld(true);
     }
   }
-  function startDirs() {
+  const dirDeg = (deg) => [0, Math.sin(rad(deg)), fz * Math.cos(rad(deg))];
+  function ghostDirs(legs) {
     const d = {};
     for (const s of ["left", "right"]) { d[s + "_thigh"] = [0, 0, fz]; d[s + "_shin"] = [0, 0, fz]; }
+    for (const L of legs) {
+      d[L.side + "_thigh"] = dirDeg(curEx === "slr" ? L.hip : 0);
+      d[L.side + "_shin"] = dirDeg(curEx === "slr" ? L.hip - L.knee : L.knee);
+    }
     return d;
   }
   function mark(side, red) {
@@ -113,14 +120,15 @@ export async function createAvatar(canvas) {
   }
   return {
     setExercise(id) {
-      fz = id === "slr" ? 1 : -1;
-      for (const r of [live, target]) { r.holder.rotation.set((id === "slr" ? -1 : 1) * Math.PI / 2, 0, 0); r.holder.position.set(0, 0.13, 0); }
+      curEx = id; fz = id === "slr" ? 1 : -1;
+      for (const r of [live, ghost]) { r.holder.rotation.set((id === "slr" ? -1 : 1) * Math.PI / 2, 0, 0); r.holder.position.set(0, 0.13, 0); }
       camera.position.set((id === "slr" ? -1 : 1) * 3.0, 0.5, 0.1); camera.lookAt(0, 0.35, 0.05);
     },
-    update({ showLive, dirs, red, side }) {
+    update({ showLive, dirs, ghostLegs, red, side }) {
       live.holder.visible = !!showLive;
-      target.holder.visible = !showLive;
-      if (showLive) applyDirs(live, dirs || {}); else applyDirs(target, startDirs());
+      for (const m of ghostMats) { m.opacity = showLive ? 0.35 : 0.9; if (m.color) m.color.set(showLive ? COL_GHOST : COL_TARGET); }
+      if (showLive) applyDirs(live, dirs || {});
+      applyDirs(ghost, ghostDirs(ghostLegs || []));
       mark(showLive ? side : null, red);
       renderer.render(scene, camera);
     }
