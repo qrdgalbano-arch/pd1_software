@@ -35,6 +35,9 @@
       "category": "Utility",
       "executableName": "qmmc-rehab",
       "maintainer": "Team 15 <team15@example.com>"
+    },
+    "deb": {
+      "afterInstall": "build/afterInstall.sh"
     }
   }
 }

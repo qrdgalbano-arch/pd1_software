@@ -10,6 +10,10 @@ apt-get update
 apt-get install -y cage dbus-user-session speech-dispatcher espeak-ng
 apt-get install -y "$DEB"
 
+# Chromium SUID sandbox helper needs root ownership and mode 4755.
+chown root:root /opt/QMMCRehab/chrome-sandbox
+chmod 4755 /opt/QMMCRehab/chrome-sandbox
+
 id kiosk >/dev/null 2>&1 || adduser --disabled-password --gecos "" kiosk
 usermod -aG video,render,audio kiosk
 
