@@ -1,0 +1,40 @@
+{
+  "name": "qmmc-rehab-kiosk",
+  "version": "1.0.0",
+  "description": "QMMC Rehab Station kiosk (Design C prototype)",
+  "author": "Team 15 <team15@example.com>",
+  "homepage": "https://github.com/qrdgalbano-arch/pd1_software",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "debug": "KIOSK_DEBUG=1 electron .",
+    "dist": "electron-builder --linux deb"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.14"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ph.qmmc.rehab",
+    "productName": "QMMCRehab",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "package.json", "node_modules/@mediapipe/tasks-vision/**"],
+    "extraResources": [
+      { "from": "../prototype", "to": "content/prototype" },
+      { "from": "../PD1_Software_Design_C/models", "to": "content/PD1_Software_Design_C/models" },
+      { "from": "../PD1_Software_Design_C/avatar/Design C", "to": "content/PD1_Software_Design_C/avatar/Design C" },
+      { "from": "../PD1_Software_Design_C/web/vendor/three", "to": "content/PD1_Software_Design_C/web/vendor/three" }
+    ],
+    "linux": {
+      "target": ["deb"],
+      "category": "Utility",
+      "executableName": "qmmc-rehab",
+      "maintainer": "Team 15 <team15@example.com>"
+    }
+  }
+}
