@@ -7,8 +7,10 @@ const q = new URLSearchParams(location.search);
 const C = { ...CONFIG, repsPerSet: +q.get("reps") || CONFIG.repsPerSet, restSeconds: +q.get("rest") || CONFIG.restSeconds };
 const MODEL = "../PD1_Software_Design_C/models/pose_landmarker_full.task";
 const SIDE = { left: [11, 23, 25, 27], right: [12, 24, 26, 28] };
+const KEYS = [11, 12, 23, 24, 25, 26, 27, 28];
+const ROTS = [0, 90, -90];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const app = { pid: null, done: {}, skipped: {}, results: {}, ex: null, landmarker: null, S: null, av: null, use3d: false };
+const app = { pid: null, done: {}, skipped: {}, results: {}, ex: null, landmarker: null, S: null, av: null, use3d: false, rot: 0, probe: 0 };
 
 function show(id) { document.querySelectorAll(".screen").forEach((e) => e.classList.add("hidden")); $("#" + id).classList.remove("hidden"); }
 function modal(html, bind) { $("#modalBox").innerHTML = html; $("#modal").classList.remove("hidden"); bind && bind(); }
@@ -74,6 +76,40 @@ $("#backList").onclick = () => { renderList(); show("list"); };
 $("#finishAll").onclick = () => { renderSummary(); show("summary"); };
 $("#toList").onclick = () => { renderList(); show("list"); };
 
+/* ---------- pose estimation (full body, auto-rotation for lying poses) ---------- */
+async function initPose() {
+  if (app.landmarker) return;
+  const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  app.landmarker = await PoseLandmarker.createFromOptions(fs, {
+    baseOptions: { modelAssetPath: MODEL }, runningMode: "VIDEO", numPoses: 1,
+    minPoseDetectionConfidence: 0.35, minPosePresenceConfidence: 0.35, minTrackingConfidence: 0.35
+  });
+}
+const rc = document.createElement("canvas");
+let lastTs = 0;
+const nextTs = () => (lastTs = Math.max(lastTs + 1, performance.now()));
+function runDetect(v, rot) {
+  const W = v.videoWidth, H = v.videoHeight; let src = v;
+  if (rot !== 0) {
+    rc.width = H; rc.height = W; const c = rc.getContext("2d"); c.save();
+    if (rot === 90) { c.translate(H, 0); c.rotate(Math.PI / 2); } else { c.translate(0, W); c.rotate(-Math.PI / 2); }
+    c.drawImage(v, 0, 0); c.restore(); src = rc;
+  }
+  const r = app.landmarker.detectForVideo(src, nextTs());
+  const raw = r.landmarks && r.landmarks[0]; if (!raw) return null;
+  return raw.map((p) => rot === 0 ? { x: p.x, y: p.y, visibility: p.visibility ?? 0 } : rot === 90 ? { x: p.y, y: 1 - p.x, visibility: p.visibility ?? 0 } : { x: 1 - p.y, y: p.x, visibility: p.visibility ?? 0 });
+}
+const quality = (lm) => KEYS.reduce((s, i) => s + lm[i].visibility, 0) / KEYS.length;
+function detect(v) {
+  let lm = runDetect(v, app.rot), qa = lm ? quality(lm) : 0;
+  if (qa < 0.5) {
+    app.probe = (app.probe + 1) % ROTS.length; const alt = ROTS[app.probe];
+    if (alt !== app.rot) { const l2 = runDetect(v, alt), q2 = l2 ? quality(l2) : 0; if (q2 > qa + 0.1) { app.rot = alt; lm = l2; qa = q2; } }
+  }
+  return lm;
+}
+function smoothLm(prev, lm) { return prev ? lm.map((p, i) => ({ x: prev[i].x + 0.5 * (p.x - prev[i].x), y: prev[i].y + 0.5 * (p.y - prev[i].y), visibility: p.visibility })) : lm.map((p) => ({ ...p })); }
+
 /* ---------- geometry ---------- */
 function ang(a, b, c) {
   const v1 = [a.x - b.x, a.y - b.y], v2 = [c.x - b.x, c.y - b.y];
@@ -81,21 +117,28 @@ function ang(a, b, c) {
   return (Math.acos(clamp((v1[0] * v2[0] + v1[1] * v2[1]) / m, -1, 1)) * 180) / Math.PI;
 }
 function sideMetrics(lm, side, W, H) {
-  const [s, h, k, a] = SIDE[side].map((i) => ({ x: lm[i].x * W, y: lm[i].y * H, v: lm[i].visibility ?? 1 }));
-  return { pts: { s, h, k, a }, vis: Math.min(s.v, h.v, k.v, a.v), hipFlex: 180 - ang(s, h, k), kneeFlex: 180 - ang(h, k, a),
-    trunkTilt: (Math.atan2(Math.abs(h.y - s.y), Math.abs(h.x - s.x)) * 180) / Math.PI, dir: Math.sign(h.x - s.x) || 1 };
+  const [s, h, k, a] = SIDE[side].map((i) => ({ x: lm[i].x * W, y: lm[i].y * H, v: lm[i].visibility }));
+  return { pts: { s, h, k, a }, hipFlex: 180 - ang(s, h, k), kneeFlex: 180 - ang(h, k, a) };
 }
 const primary = (ex, m) => (ex.id === "slr" ? m.hipFlex : m.kneeFlex);
+const moving = (ex, m) => (ex.id === "slr" ? m.hipFlex > ex.rep_start_deg && m.kneeFlex <= 25 : m.kneeFlex > ex.rep_start_deg && m.hipFlex <= ex.thigh_max_deg + 10);
+
+function avatarDirs(lm, W, H, prone, headDir) {
+  const d = {}, f = prone ? headDir : -headDir;
+  const seg = (id, a, b) => {
+    if (lm[a].visibility < 0.35 || lm[b].visibility < 0.35) return;
+    const dx = (lm[b].x - lm[a].x) * W, dy = (lm[b].y - lm[a].y) * H;
+    if (Math.hypot(dx, dy) < 4) return; d[id] = [0, -dy, f * dx];
+  };
+  seg("left_thigh", 23, 25); seg("left_shin", 25, 27); seg("right_thigh", 24, 26); seg("right_shin", 26, 28);
+  seg("left_uarm", 11, 13); seg("left_farm", 13, 15); seg("right_uarm", 12, 14); seg("right_farm", 14, 16);
+  return d;
+}
 
 /* ---------- session ---------- */
-async function initPose() {
-  if (app.landmarker) return;
-  const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
-  app.landmarker = await PoseLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: MODEL }, runningMode: "VIDEO", numPoses: 1 });
-}
 async function initAvatar(exId) {
   try {
-    if (!app.av) { setMsg("Loading 3D avatar (large file, please wait)..."); app.av = await createAvatar($("#twin3d"), q.get("flip") === "1" ? -1 : 1); }
+    if (!app.av) { setMsg("Loading 3D avatar (large file, please wait)..."); app.av = await createAvatar($("#twin3d")); }
     app.av.setExercise(exId); app.use3d = true;
   } catch (err) { console.warn("3D avatar unavailable, using 2D twin:", err); app.use3d = false; app.av = null; }
   $("#twin3d").style.display = app.use3d ? "block" : "none";
@@ -104,82 +147,97 @@ $("#startSession").onclick = async () => {
   show("record"); $("#msg").textContent = "Starting camera..."; $("#msg").className = "msg";
   try {
     await initPose();
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
     $("#vid").srcObject = stream; await $("#vid").play();
   } catch (err) { $("#msg").textContent = "Camera/model error: " + err.message + " (serve over http://localhost)"; return; }
   const ex = C.exercises[app.ex];
   await initAvatar(ex.id);
-  app.S = { ex, set: 1, legIdx: 0, reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], resume: 0, prevA: null, prevT: 0, sm: null, lost: false, running: true, guide: {} };
-  $("#rTitle").textContent = ex.name; setMsg("Get into the starting position.");
-  say(`Get into position. ${ex.id === "slr" ? "Lie on your back" : "Lie on your stomach"}, ${C.legs[0]} leg first.`, true);
+  app.S = { ex, set: 1, leg: null, legsDone: [], reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], resume: 0, prevA: null, prevT: 0, lmS: null, M: null, m: null, running: true, guide: {}, nvis: 0 };
+  $("#rTitle").textContent = ex.name; setMsg("Get into the position shown by the green target.");
+  say(`Get into position like the green target. ${ex.id === "slr" ? "Lie on your back" : "Lie on your stomach"}. Keep your whole body in view.`, true);
   requestAnimationFrame(loop);
 };
 $("#stopRec").onclick = () => finishRec(false);
 function setMsg(t, cls) { $("#msg").textContent = t; $("#msg").className = "msg " + (cls || ""); }
-function curLeg() { return C.legs[app.S.legIdx]; }
+const other = (s) => (s === "left" ? "right" : "left");
 
 function loop() {
   const S = app.S; if (!S || !S.running) return;
-  const v = $("#vid"); const ov = $("#ov");
+  const v = $("#vid"), ov = $("#ov");
   if (v.videoWidth) { ov.width = v.videoWidth; ov.height = v.videoHeight; }
   if (v.readyState >= 2 && v.videoWidth) {
-    const res = app.landmarker.detectForVideo(v, performance.now());
-    const lm = res.landmarks && res.landmarks[0];
+    const W = v.videoWidth, H = v.videoHeight, lm = detect(v);
     S.guide = {};
-    if (S.phase === "REST") restTick();
-    else if (lm) process(lm, v.videoWidth, v.videoHeight); else { S.lost = true; setMsg("I can't see you. Move into view.", "bad"); }
-    draw(lm, ov);
-    $("#rInfo").textContent = `Set ${S.set}/${C.sets} | ${curLeg()} leg | Valid ${S.reps}/${C.repsPerSet}`;
-    $("#stat").textContent = S.resume ? `Resuming: ${C.resumeValidReps - S.resume}/${C.resumeValidReps} valid reps` : "";
+    if (lm) {
+      S.lmS = smoothLm(S.lmS, lm); S.nvis = S.lmS.filter((p) => p.visibility >= 0.5).length;
+      ingest(W, H);
+      if (S.phase === "REST") restTick(); else if (S.allVisible) process(W, H);
+      else { setMsg("Move back so your whole body is in view.", "bad"); say("Move back so your whole body is in view."); }
+    } else { S.lmS = null; S.allVisible = false; S.nvis = 0; if (S.phase === "REST") restTick(); else { setMsg("I can't see you. Lie in view of the camera.", "bad"); } }
+    draw(ov, W, H);
+    $("#rInfo").textContent = `Set ${S.set}/${C.sets} | ${S.leg ? S.leg + " leg" : "choose a leg"} | Valid ${S.reps}/${C.repsPerSet}`;
+    $("#stat").textContent = `Landmarks ${S.nvis}/33 | view rotation ${app.rot} deg` + (S.resume ? ` | Resuming: ${C.resumeValidReps - S.resume}/${C.resumeValidReps} valid reps` : "");
   }
   requestAnimationFrame(loop);
 }
 
-function positionFailures(ex, m) {
-  const f = [];
-  if (m.vis < C.minVisibility) return [{ id: "vis", t: "Keep your whole leg in view." }];
-  if (m.trunkTilt > 30) f.push({ id: "lie", t: "Lie flat on the mat.", dir: "down", j: "h" });
-  if (ex.id === "slr") {
-    if (m.hipFlex > ex.rest_max_deg) f.push({ id: "low", t: "Lower your leg to the mat.", dir: "down", j: "a" });
-    if (m.kneeFlex > ex.knee_max_deg) f.push({ id: "knee", t: "Straighten your knee.", dir: "down", j: "k", red: "knee" });
-  } else {
-    if (m.hipFlex > ex.thigh_max_deg) f.push({ id: "thigh", t: "Keep your thigh flat on the mat.", dir: "down", j: "k", red: "thigh" });
-    if (m.kneeFlex > ex.rest_max_deg) f.push({ id: "str", t: "Straighten your leg on the mat.", dir: "down", j: "a" });
-  }
+function ingest(W, H) {
+  const S = app.S, lm = S.lmS;
+  S.allVisible = KEYS.every((i) => lm[i].visibility >= C.minVisibility);
+  S.M = { left: sideMetrics(lm, "left", W, H), right: sideMetrics(lm, "right", W, H) };
+  const ms = { x: (lm[11].x + lm[12].x) / 2 * W, y: (lm[11].y + lm[12].y) / 2 * H }, mh = { x: (lm[23].x + lm[24].x) / 2 * W, y: (lm[23].y + lm[24].y) / 2 * H };
+  S.trunkTilt = (Math.atan2(Math.abs(mh.y - ms.y), Math.abs(mh.x - ms.x)) * 180) / Math.PI;
+  S.headDir = Math.sign(ms.x - mh.x) || -1;
+  const side = S.leg || (S.ex.id === "slr" ? (S.M.left.hipFlex >= S.M.right.hipFlex ? "left" : "right") : (S.M.left.kneeFlex >= S.M.right.kneeFlex ? "left" : "right"));
+  S.m = S.M[side]; S.mSide = side;
+}
+
+function positionFailures(ex, S) {
+  const f = [], M = S.M;
+  if (S.trunkTilt > 30) f.push({ id: "lie", t: "Lie flat on the mat.", dir: "down", j: "h" });
+  const ok = (m) => (ex.id === "slr" ? m.hipFlex <= ex.rest_max_deg && m.kneeFlex <= ex.knee_max_deg : m.kneeFlex <= ex.rest_max_deg && m.hipFlex <= ex.thigh_max_deg);
+  if (S.leg) {
+    const m = M[S.leg];
+    if (ex.id === "slr") {
+      if (m.hipFlex > ex.rest_max_deg) f.push({ id: "low", t: "Lower your leg to the mat.", dir: "down", j: "a" });
+      if (m.kneeFlex > ex.knee_max_deg) f.push({ id: "knee", t: "Straighten your knee.", dir: "down", j: "k", red: "knee" });
+    } else {
+      if (m.hipFlex > ex.thigh_max_deg) f.push({ id: "thigh", t: "Keep your thigh flat on the mat.", dir: "down", j: "k", red: "thigh" });
+      if (m.kneeFlex > ex.rest_max_deg) f.push({ id: "str", t: "Straighten your leg on the mat.", dir: "down", j: "a" });
+    }
+  } else if (ex.id === "slr") { if (!ok(M.left) && !ok(M.right)) f.push({ id: "low", t: "Lower and straighten one leg on the mat.", dir: "down", j: "a" }); }
+  else if (!ok(M.left) || !ok(M.right)) f.push({ id: "str", t: "Lie on your stomach with both legs straight.", dir: "down", j: "a" });
   return f;
 }
 
-function process(lm, W, H) {
-  const S = app.S, ex = S.ex, now = performance.now() / 1000, side = curLeg();
-  const other = side === "left" ? "right" : "left";
-  const raw = sideMetrics(lm, side, W, H), oth = sideMetrics(lm, other, W, H);
-  const k = 0.45;
-  S.sm = S.sm ? { hipFlex: S.sm.hipFlex + k * (raw.hipFlex - S.sm.hipFlex), kneeFlex: S.sm.kneeFlex + k * (raw.kneeFlex - S.sm.kneeFlex) } : { hipFlex: raw.hipFlex, kneeFlex: raw.kneeFlex };
-  const m = { ...raw, hipFlex: S.sm.hipFlex, kneeFlex: S.sm.kneeFlex }; S.m = m; S.oth = oth;
-  const a = primary(ex, m);
-
-  if (raw.vis < C.minVisibility) { S.lost = true; setMsg("Keep your whole leg in view.", "bad"); say("Keep your whole leg in view."); return; }
-  S.lost = false;
-
+function process(W, H) {
+  const S = app.S, ex = S.ex, now = performance.now() / 1000, M = S.M;
   if (S.phase === "POSITION") {
-    const f = positionFailures(ex, m);
-    if (f.length) {
-      S.hold = null; setMsg(f[0].t, "bad"); say(f[0].t); S.guide = { dir: f[0].dir, j: f[0].j, red: f[0].red };
-    } else {
+    const f = positionFailures(ex, S);
+    if (f.length) { S.hold = null; setMsg(f[0].t, "bad"); say(f[0].t); S.guide = { dir: f[0].dir, j: f[0].j, red: f[0].red }; }
+    else {
       S.hold = S.hold || now; setMsg("Hold still...");
-      if (now - S.hold >= C.holdReadySeconds) { S.phase = "READY"; S.hold = null; setMsg("Position ready. Begin the exercise.", "good"); say("Position ready. Begin.", true); }
+      if (now - S.hold >= C.holdReadySeconds) { S.phase = "READY"; S.hold = null; setMsg(S.leg ? `Position ready. Begin with your ${S.leg} leg.` : "Position ready. Raise the leg you want to exercise first.", "good"); say(S.leg ? `Position ready. Use your ${S.leg} leg.` : "Position ready. Raise one leg to begin.", true); }
     }
     return;
   }
   if (S.phase === "READY") {
-    const f = positionFailures(ex, m).filter((x) => x.id !== "vis");
-    if (primary(ex, oth) > ex.rep_start_deg && a < ex.rest_max_deg) { setMsg(`Wrong leg. Use your ${side} leg.`, "bad"); say(`Wrong leg. Use your ${side} leg.`); S.guide = { red: "other" }; return; }
-    if (a > ex.rep_start_deg) { S.phase = "MOVING"; S.peak = a; S.viol = null; S.devT = {}; S.prevA = a; S.prevT = now; return; }
-    if (f.length && a <= ex.rest_max_deg) { S.hold = S.hold || now; if (now - S.hold > 1.5) { S.phase = "POSITION"; S.hold = null; } } else S.hold = null;
+    if (!S.leg) {
+      const c = ["left", "right"].filter((s) => moving(ex, M[s]));
+      if (!c.length) { setMsg("Raise the leg you want to exercise first."); S.guide = { dir: "up", j: "a" }; return; }
+      S.leg = c.sort((a, b) => primary(ex, M[b]) - primary(ex, M[a]))[0];
+      say(`Using your ${S.leg} leg.`, true);
+    }
+    const m = M[S.leg], o = M[other(S.leg)];
+    if (moving(ex, o) && primary(ex, m) < ex.rest_max_deg) { setMsg(`Wrong leg. Use your ${S.leg} leg.`, "bad"); say(`Wrong leg. Use your ${S.leg} leg.`); S.guide = { red: "other" }; return; }
+    if (primary(ex, m) > ex.rep_start_deg) { S.phase = "MOVING"; S.peak = primary(ex, m); S.viol = null; S.devT = {}; S.prevA = S.peak; S.prevT = now; return; }
+    const f = positionFailures(ex, S).filter((x) => x.id !== "lie");
+    if (f.length && primary(ex, m) <= ex.rest_max_deg) { S.hold = S.hold || now; if (now - S.hold > 1.5) { S.phase = "POSITION"; S.hold = null; } } else S.hold = null;
     setMsg(`Raise your ${ex.motion === "hip flexion" ? "leg" : "heel"} slowly.`); S.guide = { dir: "up", j: "a" };
     return;
   }
   if (S.phase === "MOVING") {
+    const m = M[S.leg], a = primary(ex, m);
     S.peak = Math.max(S.peak, a);
     const speed = S.prevA == null ? 0 : Math.abs(a - S.prevA) / Math.max(now - S.prevT, 0.016);
     S.prevA = a; S.prevT = now;
@@ -197,17 +255,14 @@ function process(lm, W, H) {
     else if (S.peak >= ex.target_deg) { setMsg("Good. Now lower slowly.", "good"); S.guide = { dir: "down", j: "a" }; }
     else { setMsg("Keep going. Lift higher.", ""); S.guide = { dir: "up", j: "a" }; }
     if (a < ex.rest_max_deg) completeRep(m);
-    return;
   }
 }
 
 function completeRep(m) {
   const S = app.S, ex = S.ex;
-  const reasonLow = S.peak < ex.target_deg;
-  const valid = !reasonLow && !S.viol;
-  const rec = { set: S.set, leg: curLeg(), peak: +S.peak.toFixed(1), rom: +(S.peak - Math.min(primary(ex, m), ex.rest_max_deg)).toFixed(1), valid, reason: valid ? null : reasonLow ? "Below target range" : S.viol.id };
-  S.data.push(rec);
-  S.phase = "READY"; S.hold = null; S.sm = null;
+  const reasonLow = S.peak < ex.target_deg, valid = !reasonLow && !S.viol;
+  S.data.push({ set: S.set, leg: S.leg, peak: +S.peak.toFixed(1), rom: +(S.peak - Math.min(primary(ex, m), ex.rest_max_deg)).toFixed(1), valid, reason: valid ? null : reasonLow ? "Below target range" : S.viol.id });
+  S.phase = "READY"; S.hold = null;
   if (valid) {
     beep(); S.reps++; if (S.resume > 0) S.resume--;
     setMsg(`Rep ${S.reps} counted.`, "good");
@@ -216,7 +271,11 @@ function completeRep(m) {
 }
 function legDone() {
   const S = app.S;
-  if (S.legIdx < C.legs.length - 1) { S.legIdx++; S.reps = 0; S.phase = "POSITION"; setMsg(`Leg done. Switch to your ${curLeg()} leg.`, "good"); say(`Leg done. Switch to your ${curLeg()} leg.`, true); return; }
+  S.legsDone.push(S.leg);
+  if (S.legsDone.length < C.legs.length) {
+    S.leg = other(S.leg); S.reps = 0; S.phase = "POSITION"; S.hold = null;
+    setMsg(`Leg done. Now your ${S.leg} leg.`, "good"); say(`Leg done. Now your ${S.leg} leg.`, true); return;
+  }
   if (S.set < C.sets) { S.phase = "REST"; S.restEnd = performance.now() / 1000 + C.restSeconds; $("#rest").classList.remove("hidden"); setMsg("Set complete. Rest.", "good"); say("Set complete. Rest.", true); return; }
   finishRec(true);
 }
@@ -224,7 +283,7 @@ function restTick() {
   const S = app.S, left = Math.ceil(S.restEnd - performance.now() / 1000);
   $("#restClock").textContent = `${String(Math.floor(Math.max(left, 0) / 60)).padStart(2, "0")}:${String(Math.max(left, 0) % 60).padStart(2, "0")}`;
   if (left <= 0) {
-    $("#rest").classList.add("hidden"); S.set++; S.legIdx = 0; S.reps = 0; S.phase = "POSITION"; S.resume = C.resumeValidReps; S.sm = null;
+    $("#rest").classList.add("hidden"); S.set++; S.leg = null; S.legsDone = []; S.reps = 0; S.phase = "POSITION"; S.hold = null; S.resume = C.resumeValidReps;
     setMsg(`Rest finished. Get ready for set ${S.set}.`); say(`Rest finished. Set ${S.set}. Get into position.`, true);
   }
 }
@@ -271,31 +330,44 @@ function arrow(ctx, x, y, dir, len, col) {
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + dy * len); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x - 12, y + dy * (len - 14)); ctx.lineTo(x, y + dy * (len + 8)); ctx.lineTo(x + 12, y + dy * (len - 14)); ctx.fill();
 }
-function draw(lm, ov) {
+function draw(ov, W, H) {
   const S = app.S, ctx = ov.getContext("2d"); ctx.clearRect(0, 0, ov.width, ov.height);
-  if (lm && S.m) {
-    const p = S.m.pts, red = S.guide.red;
-    const seg = (a, b, bad) => { ctx.strokeStyle = bad ? "#ff2d2d" : "#2dff8a"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
-    seg(p.s, p.h, false); seg(p.h, p.k, red === "thigh" || red === "leg" || red === "knee"); seg(p.k, p.a, red === "knee" || red === "leg");
-    if (S.guide.dir && S.guide.j) arrow(ctx, p[S.guide.j].x + 30, p[S.guide.j].y - (S.guide.dir === "up" ? 10 : 70), S.guide.dir, 55, "#ffd400");
+  const lm = S.lmS;
+  if (lm) {
+    const lw = Math.max(2, W / 320);
+    ctx.lineWidth = lw; ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    for (const c of PoseLandmarker.POSE_CONNECTIONS) {
+      const a = lm[c.start], b = lm[c.end]; if (a.visibility < 0.3 || b.visibility < 0.3) continue;
+      ctx.beginPath(); ctx.moveTo(a.x * W, a.y * H); ctx.lineTo(b.x * W, b.y * H); ctx.stroke();
+    }
+    lm.forEach((p) => { ctx.fillStyle = p.visibility >= 0.5 ? "#2dff8a" : "#ffb300"; ctx.beginPath(); ctx.arc(p.x * W, p.y * H, lw * 1.6, 0, 7); ctx.fill(); });
+    if (S.m) {
+      const p = S.m.pts, red = S.guide.red;
+      const seg = (a, b, bad) => { ctx.strokeStyle = bad ? "#ff2d2d" : "#00e5ff"; ctx.lineWidth = lw * 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+      seg(p.s, p.h, false); seg(p.h, p.k, red === "thigh" || red === "leg" || red === "knee"); seg(p.k, p.a, red === "knee" || red === "leg");
+      if (S.guide.dir && S.guide.j) arrow(ctx, p[S.guide.j].x + 30, p[S.guide.j].y - (S.guide.dir === "up" ? 10 : 70), S.guide.dir, 55, "#ffd400");
+    }
   }
-  drawTwin();
+  drawTwin(W, H);
 }
-function drawTwin() {
+function drawTwin(W, H) {
   const S = app.S, c = $("#twin"), ctx = c.getContext("2d"), ex = S.ex; ctx.clearRect(0, 0, c.width, c.height);
-  const m = S.m || { hipFlex: 0, kneeFlex: 0 }, g = S.guide || {};
-  const gh = S.phase === "MOVING" || S.phase === "READY" ? ex.ghost_deg : 0;
+  const g = S.guide || {}, showLive = S.phase !== "POSITION" && !!S.lmS;
+  const gh = S.phase === "MOVING" || (S.phase === "READY" && S.leg) ? ex.ghost_deg : 0;
+  const ghostLegs = gh && S.leg ? [{ side: S.leg, hip: ex.id === "slr" ? gh : 0, knee: ex.id === "plf" ? gh : 0 }] : [];
   if (app.use3d) {
     try {
-      app.av.update({ side: curLeg(), ex: ex.id, hip: m.hipFlex, knee: m.kneeFlex, ghostHip: ex.id === "slr" ? gh : 0, ghostKnee: ex.id === "plf" ? gh : 0, red: g.red });
+      const dirs = showLive ? avatarDirs(S.lmS, W, H, ex.id === "plf", S.headDir) : {};
+      app.av.update({ showLive, dirs, ghostLegs, red: g.red, side: S.leg });
     } catch (err) { console.warn("3D update failed, switching to 2D twin:", err); app.use3d = false; $("#twin3d").style.display = "none"; }
   }
   if (!app.use3d) {
-    const ox = 170, oy = 210;
+    const ox = 170, oy = 210, m = S.m || { hipFlex: 0, kneeFlex: 0 };
     ctx.fillStyle = "#cfd8dc"; ctx.fillRect(20, oy + 18, 380, 8);
-    skeleton(ctx, ox, oy, ex, ex.id === "slr" ? gh : 0, ex.id === "plf" ? gh : 0, 0.3, "#1565c0", null);
-    skeleton(ctx, ox, oy, ex, m.hipFlex, m.kneeFlex, 1, "#00796b", g.red);
+    skeleton(ctx, ox, oy, ex, ex.id === "slr" ? gh : 0, ex.id === "plf" ? gh : 0, showLive ? 0.3 : 0.8, showLive ? "#1565c0" : "#2e7d32", null);
+    if (showLive) skeleton(ctx, ox, oy, ex, m.hipFlex, m.kneeFlex, 1, "#00796b", g.red);
   }
+  ctx.fillStyle = "#333"; ctx.font = "bold 14px system-ui"; ctx.fillText(showLive ? "You (solid) / target (faded blue)" : "TARGET POSITION - match this", 10, 20);
   if (g.dir) arrow(ctx, 340, g.dir === "up" ? 190 : 80, g.dir, 60, "#f9a825");
 }
 function skeleton(ctx, ox, oy, ex, hip, knee, alpha, col, red) {
