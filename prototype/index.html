@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rehab Station - Design C Prototype</title><link rel="stylesheet" href="style.css"></head>
+<title>Rehab Station - Design C Prototype</title><link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"../PD1_Software_Design_C/web/vendor/three/build/three.module.js"}}</script></head>
 <body>
 <header><b>QMMC Rehab Station</b><span id="who"></span></header>
 
@@ -18,7 +19,7 @@
 <section id="record" class="screen hidden">
 <div class="bar"><span id="rTitle"></span><span id="rInfo"></span></div>
 <div class="grid"><div class="cam"><video id="vid" playsinline muted></video><canvas id="ov"></canvas></div>
-<div class="twin"><canvas id="twin" width="420" height="300"></canvas><small>Digital twin: solid = you, faded = target</small></div></div>
+<div><div class="twin"><canvas id="twin3d" width="420" height="300"></canvas><canvas id="twin" width="420" height="300"></canvas></div><small>Digital twin: solid = you, faded blue = target</small></div></div>
 <div id="msg" class="msg">Starting camera...</div>
 <div id="stat" class="stat"></div>
 <div id="rest" class="hidden card"><h3>Rest</h3><div id="restClock" class="clock"></div><button id="extend">Extend rest (+1 min)</button></div>
