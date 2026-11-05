@@ -7,10 +7,11 @@ const q = new URLSearchParams(location.search);
 const C = { ...CONFIG, repsPerSet: +q.get("reps") || CONFIG.repsPerSet, restSeconds: +q.get("rest") || CONFIG.restSeconds };
 const MODEL = "../PD1_Software_Design_C/models/pose_landmarker_full.task";
 const SIDE = { left: [11, 23, 25, 27], right: [12, 24, 26, 28] };
+const PART = ["shoulder", "hip", "knee", "ankle"];
 const KEYS = [11, 12, 23, 24, 25, 26, 27, 28];
 const ROTS = [0, 90, -90];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const app = { pid: null, done: {}, skipped: {}, results: {}, ex: null, landmarker: null, S: null, av: null, use3d: false, rot: 0, probe: 0 };
+const app = { pid: null, done: {}, skipped: {}, results: {}, ex: null, landmarker: null, S: null, av: null, use3d: false, rot: 0, rotMode: localStorage.getItem("rotMode") || "auto" };
 
 function show(id) { document.querySelectorAll(".screen").forEach((e) => e.classList.add("hidden")); $("#" + id).classList.remove("hidden"); }
 function modal(html, bind) { $("#modalBox").innerHTML = html; $("#modal").classList.remove("hidden"); bind && bind(); }
@@ -76,7 +77,7 @@ $("#backList").onclick = () => { renderList(); show("list"); };
 $("#finishAll").onclick = () => { renderSummary(); show("summary"); };
 $("#toList").onclick = () => { renderList(); show("list"); };
 
-/* ---------- pose estimation (full body, auto-rotation for lying poses) ---------- */
+/* ---------- pose estimation (full body, rotation for lying poses) ---------- */
 async function initPose() {
   if (app.landmarker) return;
   const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
@@ -99,12 +100,25 @@ function runDetect(v, rot) {
   const raw = r.landmarks && r.landmarks[0]; if (!raw) return null;
   return raw.map((p) => rot === 0 ? { x: p.x, y: p.y, visibility: p.visibility ?? 0 } : rot === 90 ? { x: p.y, y: 1 - p.x, visibility: p.visibility ?? 0 } : { x: 1 - p.y, y: p.x, visibility: p.visibility ?? 0 });
 }
-const quality = (lm) => KEYS.reduce((s, i) => s + lm[i].visibility, 0) / KEYS.length;
+// A confident skeleton is only trusted if the trunk lies roughly horizontal in the camera image (patient is lying, camera at the side).
+function score(lm, W, H) {
+  if (!lm) return 0;
+  const v = KEYS.reduce((s, i) => s + lm[i].visibility, 0) / KEYS.length;
+  const ms = [(lm[11].x + lm[12].x) / 2 * W, (lm[11].y + lm[12].y) / 2 * H], mh = [(lm[23].x + lm[24].x) / 2 * W, (lm[23].y + lm[24].y) / 2 * H];
+  const tilt = (Math.atan2(Math.abs(mh[1] - ms[1]), Math.abs(mh[0] - ms[0])) * 180) / Math.PI;
+  const inside = KEYS.every((i) => lm[i].x > -0.05 && lm[i].x < 1.05 && lm[i].y > -0.05 && lm[i].y < 1.05);
+  return tilt <= 50 && inside ? v : v * 0.2;
+}
 function detect(v) {
-  let lm = runDetect(v, app.rot), qa = lm ? quality(lm) : 0;
-  if (qa < 0.5) {
-    app.probe = (app.probe + 1) % ROTS.length; const alt = ROTS[app.probe];
-    if (alt !== app.rot) { const l2 = runDetect(v, alt), q2 = l2 ? quality(l2) : 0; if (q2 > qa + 0.1) { app.rot = alt; lm = l2; qa = q2; } }
+  const W = v.videoWidth, H = v.videoHeight;
+  if (app.rotMode !== "auto") { app.rot = +app.rotMode; return runDetect(v, app.rot); }
+  let lm = runDetect(v, app.rot), sc = score(lm, W, H);
+  if (sc < 0.5) {
+    for (const alt of ROTS) {
+      if (alt === app.rot) continue;
+      const l2 = runDetect(v, alt), s2 = score(l2, W, H);
+      if (s2 > sc + 0.1) { sc = s2; lm = l2; app.rot = alt; }
+    }
   }
   return lm;
 }
@@ -143,18 +157,21 @@ async function initAvatar(exId) {
   } catch (err) { console.warn("3D avatar unavailable, using 2D twin:", err); app.use3d = false; app.av = null; }
   $("#twin3d").style.display = app.use3d ? "block" : "none";
 }
+$("#rotSel").value = app.rotMode;
+$("#rotSel").onchange = (e) => { app.rotMode = e.target.value; localStorage.setItem("rotMode", app.rotMode); if (app.S) app.S.lmS = null; };
 $("#startSession").onclick = async () => {
   show("record"); $("#msg").textContent = "Starting camera..."; $("#msg").className = "msg";
   try {
     await initPose();
     const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
     $("#vid").srcObject = stream; await $("#vid").play();
+    $(".cam").style.aspectRatio = `${$("#vid").videoWidth} / ${$("#vid").videoHeight}`;
   } catch (err) { $("#msg").textContent = "Camera/model error: " + err.message + " (serve over http://localhost)"; return; }
   const ex = C.exercises[app.ex];
   await initAvatar(ex.id);
-  app.S = { ex, set: 1, leg: null, legsDone: [], reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], resume: 0, prevA: null, prevT: 0, lmS: null, M: null, m: null, running: true, guide: {}, nvis: 0 };
+  app.S = { ex, set: 1, leg: null, legsDone: [], reps: 0, phase: "POSITION", hold: null, peak: 0, viol: null, devT: {}, data: [], resume: 0, prevA: null, prevT: 0, lmS: null, M: null, m: null, running: true, guide: {}, nvis: 0, sv: { left: 0, right: 0 } };
   $("#rTitle").textContent = ex.name; setMsg("Get into the position shown by the green target.");
-  say(`Get into position like the green target. ${ex.id === "slr" ? "Lie on your back" : "Lie on your stomach"}. Keep your whole body in view.`, true);
+  say(`Get into position like the green target. ${ex.id === "slr" ? "Lie on your back" : "Lie on your stomach"}.`, true);
   requestAnimationFrame(loop);
 };
 $("#stopRec").onclick = () => finishRec(false);
@@ -164,7 +181,7 @@ const other = (s) => (s === "left" ? "right" : "left");
 function loop() {
   const S = app.S; if (!S || !S.running) return;
   const v = $("#vid"), ov = $("#ov");
-  if (v.videoWidth) { ov.width = v.videoWidth; ov.height = v.videoHeight; }
+  if (v.videoWidth && (ov.width !== v.videoWidth || ov.height !== v.videoHeight)) { ov.width = v.videoWidth; ov.height = v.videoHeight; }
   if (v.readyState >= 2 && v.videoWidth) {
     const W = v.videoWidth, H = v.videoHeight, lm = detect(v);
     S.guide = {};
@@ -172,30 +189,39 @@ function loop() {
       S.lmS = smoothLm(S.lmS, lm); S.nvis = S.lmS.filter((p) => p.visibility >= 0.5).length;
       ingest(W, H);
       if (S.phase === "REST") restTick(); else if (S.allVisible) process(W, H);
-      else { setMsg("Move back so your whole body is in view.", "bad"); say("Move back so your whole body is in view."); }
-    } else { S.lmS = null; S.allVisible = false; S.nvis = 0; if (S.phase === "REST") restTick(); else { setMsg("I can't see you. Lie in view of the camera.", "bad"); } }
+      else if (S.phase !== "REST") { setMsg(S.visMsg, "bad"); say(S.visMsg); }
+    } else { S.lmS = null; S.allVisible = false; S.nvis = 0; if (S.phase === "REST") restTick(); else setMsg("I can't see you. Lie in view of the camera.", "bad"); }
     draw(ov, W, H);
     $("#rInfo").textContent = `Set ${S.set}/${C.sets} | ${S.leg ? S.leg + " leg" : "choose a leg"} | Valid ${S.reps}/${C.repsPerSet}`;
-    $("#stat").textContent = `Landmarks ${S.nvis}/33 | view rotation ${app.rot} deg` + (S.resume ? ` | Resuming: ${C.resumeValidReps - S.resume}/${C.resumeValidReps} valid reps` : "");
+    $("#stat").textContent = `Landmarks ${S.nvis}/33 | rotation ${app.rot} deg (${app.rotMode})` + (S.resume ? ` | Resuming: ${C.resumeValidReps - S.resume}/${C.resumeValidReps} valid reps` : "");
   }
   requestAnimationFrame(loop);
 }
 
 function ingest(W, H) {
   const S = app.S, lm = S.lmS;
-  S.allVisible = KEYS.every((i) => lm[i].visibility >= C.minVisibility);
   S.M = { left: sideMetrics(lm, "left", W, H), right: sideMetrics(lm, "right", W, H) };
+  const sv = (side) => Math.min(...SIDE[side].map((i) => lm[i].visibility));
+  S.sv = { left: sv("left"), right: sv("right") };
+  // Side-view rule: the camera-side leg must be clear; the far-side leg may be partly hidden.
+  const best = S.sv.left >= S.sv.right ? "left" : "right", far = other(best);
+  S.allVisible = S.sv[best] >= C.minVisibility && S.sv[far] >= 0.15;
+  if (!S.allVisible) {
+    const side = S.sv[best] < C.minVisibility ? best : far;
+    const idx = SIDE[side].map((i, k) => [lm[i].visibility, k]).sort((a, b) => a[0] - b[0])[0][1];
+    S.visMsg = `I can't see your ${side} ${PART[idx]} clearly. Adjust the camera or your position.`;
+  }
   const ms = { x: (lm[11].x + lm[12].x) / 2 * W, y: (lm[11].y + lm[12].y) / 2 * H }, mh = { x: (lm[23].x + lm[24].x) / 2 * W, y: (lm[23].y + lm[24].y) / 2 * H };
   S.trunkTilt = (Math.atan2(Math.abs(mh.y - ms.y), Math.abs(mh.x - ms.x)) * 180) / Math.PI;
   S.headDir = Math.sign(ms.x - mh.x) || -1;
-  const side = S.leg || (S.ex.id === "slr" ? (S.M.left.hipFlex >= S.M.right.hipFlex ? "left" : "right") : (S.M.left.kneeFlex >= S.M.right.kneeFlex ? "left" : "right"));
+  const side = S.leg || best;
   S.m = S.M[side]; S.mSide = side;
 }
 
 function positionFailures(ex, S) {
   const f = [], M = S.M;
   if (S.trunkTilt > 30) f.push({ id: "lie", t: "Lie flat on the mat.", dir: "down", j: "h" });
-  const ok = (m) => (ex.id === "slr" ? m.hipFlex <= ex.rest_max_deg && m.kneeFlex <= ex.knee_max_deg : m.kneeFlex <= ex.rest_max_deg && m.hipFlex <= ex.thigh_max_deg);
+  const ok = (s) => S.sv[s] < 0.3 || (ex.id === "slr" ? M[s].hipFlex <= ex.rest_max_deg && M[s].kneeFlex <= ex.knee_max_deg : M[s].kneeFlex <= ex.rest_max_deg && M[s].hipFlex <= ex.thigh_max_deg);
   if (S.leg) {
     const m = M[S.leg];
     if (ex.id === "slr") {
@@ -205,8 +231,8 @@ function positionFailures(ex, S) {
       if (m.hipFlex > ex.thigh_max_deg) f.push({ id: "thigh", t: "Keep your thigh flat on the mat.", dir: "down", j: "k", red: "thigh" });
       if (m.kneeFlex > ex.rest_max_deg) f.push({ id: "str", t: "Straighten your leg on the mat.", dir: "down", j: "a" });
     }
-  } else if (ex.id === "slr") { if (!ok(M.left) && !ok(M.right)) f.push({ id: "low", t: "Lower and straighten one leg on the mat.", dir: "down", j: "a" }); }
-  else if (!ok(M.left) || !ok(M.right)) f.push({ id: "str", t: "Lie on your stomach with both legs straight.", dir: "down", j: "a" });
+  } else if (ex.id === "slr") { if (!ok("left") && !ok("right")) f.push({ id: "low", t: "Lower and straighten one leg on the mat.", dir: "down", j: "a" }); }
+  else if (!ok("left") || !ok("right")) f.push({ id: "str", t: "Lie on your stomach with both legs straight.", dir: "down", j: "a" });
   return f;
 }
 
@@ -223,13 +249,13 @@ function process(W, H) {
   }
   if (S.phase === "READY") {
     if (!S.leg) {
-      const c = ["left", "right"].filter((s) => moving(ex, M[s]));
+      const c = ["left", "right"].filter((s) => S.sv[s] >= 0.3 && moving(ex, M[s]));
       if (!c.length) { setMsg("Raise the leg you want to exercise first."); S.guide = { dir: "up", j: "a" }; return; }
       S.leg = c.sort((a, b) => primary(ex, M[b]) - primary(ex, M[a]))[0];
       say(`Using your ${S.leg} leg.`, true);
     }
     const m = M[S.leg], o = M[other(S.leg)];
-    if (moving(ex, o) && primary(ex, m) < ex.rest_max_deg) { setMsg(`Wrong leg. Use your ${S.leg} leg.`, "bad"); say(`Wrong leg. Use your ${S.leg} leg.`); S.guide = { red: "other" }; return; }
+    if (S.sv[other(S.leg)] >= 0.3 && moving(ex, o) && primary(ex, m) < ex.rest_max_deg) { setMsg(`Wrong leg. Use your ${S.leg} leg.`, "bad"); say(`Wrong leg. Use your ${S.leg} leg.`); S.guide = { red: "other" }; return; }
     if (primary(ex, m) > ex.rep_start_deg) { S.phase = "MOVING"; S.peak = primary(ex, m); S.viol = null; S.devT = {}; S.prevA = S.peak; S.prevT = now; return; }
     const f = positionFailures(ex, S).filter((x) => x.id !== "lie");
     if (f.length && primary(ex, m) <= ex.rest_max_deg) { S.hold = S.hold || now; if (now - S.hold > 1.5) { S.phase = "POSITION"; S.hold = null; } } else S.hold = null;
