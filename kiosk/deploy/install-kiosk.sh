@@ -5,6 +5,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DEB="${1:-$(ls "$HERE"/../dist/*.deb 2>/dev/null | head -n1)}"
 [ -f "$DEB" ] || { echo "No .deb found. Build it first: cd kiosk && npm install && npm run dist"; exit 1; }
+DEB="$(realpath "$DEB")"   # apt needs an absolute or ./ path, otherwise it looks for a package name
 
 apt-get update
 apt-get install -y cage dbus-user-session speech-dispatcher espeak-ng
