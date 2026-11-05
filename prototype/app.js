@@ -279,21 +279,23 @@ function process(W, H) {
     ["knee", "thigh", "fast"].forEach((id) => { if (!dev.find((d) => d.id === id)) delete S.devT[id]; });
     if (S.activeDev) { setMsg(S.activeDev.t, "bad"); say(S.activeDev.t); S.guide = { dir: "down", j: "k", red: S.activeDev.red }; }
     else if (S.peak >= ex.target_deg) { setMsg("Good. Now lower slowly.", "good"); S.guide = { dir: "down", j: "a" }; }
-    else { setMsg("Keep going. Lift higher.", ""); S.guide = { dir: "up", j: "a" }; }
+    else { setMsg("Good form. Keep lifting toward the target.", ""); S.guide = { dir: "up", j: "a" }; }
     if (a < ex.rest_max_deg) completeRep(m);
   }
 }
 
+// A rep counts when the movement cycle is completed with correct form (knee straight / thigh flat / not too fast).
+// The range reached does NOT decide validity; it is recorded for the ROM average and the target-reached count.
 function completeRep(m) {
   const S = app.S, ex = S.ex;
-  const reasonLow = S.peak < ex.target_deg, valid = !reasonLow && !S.viol;
-  S.data.push({ set: S.set, leg: S.leg, peak: +S.peak.toFixed(1), rom: +(S.peak - Math.min(primary(ex, m), ex.rest_max_deg)).toFixed(1), valid, reason: valid ? null : reasonLow ? "Below target range" : S.viol.id });
+  const valid = !S.viol, reached = S.peak >= ex.target_deg;
+  S.data.push({ set: S.set, leg: S.leg, peak: +S.peak.toFixed(1), rom: +(S.peak - Math.min(primary(ex, m), ex.rest_max_deg)).toFixed(1), valid, reachedTarget: reached, reason: valid ? null : S.viol.id });
   S.phase = "READY"; S.hold = null;
   if (valid) {
     beep(); S.reps++; if (S.resume > 0) S.resume--;
-    setMsg(`Rep ${S.reps} counted.`, "good");
+    setMsg(reached ? `Rep ${S.reps} counted.` : `Rep ${S.reps} counted. Try to lift a little higher next time.`, "good");
     if (S.reps >= C.repsPerSet) return legDone();
-  } else { const t = reasonLow ? "Not counted. Lift a little higher." : "Not counted. " + S.viol.t; setMsg(t, "bad"); say(t, true); }
+  } else { const t = "Not counted. " + S.viol.t; setMsg(t, "bad"); say(t, true); }
 }
 function legDone() {
   const S = app.S;
@@ -328,17 +330,17 @@ function finishRec(complete) {
 function stats(ex, rows) {
   const v = rows.filter((r) => r.valid); if (!v.length) return null;
   const avg = (k) => v.reduce((s, r) => s + r[k], 0) / v.length;
-  return { n: v.length, bad: rows.length - v.length, rom: avg("rom"), peak: avg("peak"), wnl: avg("rom") >= ex.wnl_min_deg };
+  return { n: v.length, bad: rows.length - v.length, reached: v.filter((r) => r.reachedTarget).length, rom: avg("rom"), peak: avg("peak"), wnl: avg("rom") >= ex.wnl_min_deg };
 }
 function renderSummary() {
   let h = `<p>Patient ID ${app.pid || "-"} | ${C.patient.name}, ${C.patient.sex}, ${C.patient.age}</p>`;
   Object.values(app.results).forEach((r) => {
-    h += `<h3>${r.ex.name} (${r.ex.motion})</h3><p class="tag">Standard: ${r.ex.wnl_source}. WNL if average valid-rep ROM >= ${r.ex.wnl_min_deg} deg.</p>
-    <table><tr><th>Leg</th><th>Valid reps</th><th>Not counted</th><th>Avg ROM (valid)</th><th>Classification</th></tr>`;
+    h += `<h3>${r.ex.name} (${r.ex.motion})</h3><p class="tag">Standard: ${r.ex.wnl_source}. WNL if average valid-rep ROM >= ${r.ex.wnl_min_deg} deg. Exercise target per rep: ${r.ex.target_deg} deg.</p>
+    <table><tr><th>Leg</th><th>Valid reps</th><th>Reached exercise target</th><th>Not counted (form)</th><th>Avg ROM (valid)</th><th>Classification</th></tr>`;
     C.legs.forEach((leg) => {
       const s = stats(r.ex, r.data.filter((d) => d.leg === leg));
-      h += s ? `<tr><td>${leg}</td><td>${s.n}</td><td>${s.bad}</td><td>${s.rom.toFixed(1)} deg</td><td class="${s.wnl ? "wnl" : "low"}">${s.wnl ? "Within normal limits" : "Below normal limits"}</td></tr>`
-             : `<tr><td>${leg}</td><td>0</td><td>-</td><td>n/a</td><td>Not assessed</td></tr>`;
+      h += s ? `<tr><td>${leg}</td><td>${s.n}</td><td>${s.reached}/${s.n}</td><td>${s.bad}</td><td>${s.rom.toFixed(1)} deg</td><td class="${s.wnl ? "wnl" : "low"}">${s.wnl ? "Within normal limits" : "Below normal limits"}</td></tr>`
+             : `<tr><td>${leg}</td><td>0</td><td>-</td><td>-</td><td>n/a</td><td>Not assessed</td></tr>`;
     });
     h += "</table>";
   });
